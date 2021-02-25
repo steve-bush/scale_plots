@@ -5,12 +5,15 @@ import matplotlib.pyplot as plt
 
 class Plots():
 
+    def __init__(self):
+        self.df = None
+
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
         a pandas df
         '''
-        sensitivities = {}
-        self.extra_data = {}
+        data = {}
+        experiment = filename[:-4]
         with open(filename, 'r') as file:
             lines = file.readlines()
 
@@ -18,9 +21,8 @@ class Plots():
             num_neutron_groups = int(lines[1].split()[0])
             num_sens_profiles = int(lines[2].split()[0])
             num_nuc_integrated = int(lines[2].split()[5])
-            self.extra_data['keff'] = {}
-            self.extra_data['keff']['value'] = float(lines[3].split()[0])
-            self.extra_data['keff']['stdev'] = float(lines[3].split()[2])
+            data[(experiment, 'keff', 'value')] = float(lines[3].split()[0])
+            data[(experiment, 'keff', 'std dev')] = float(lines[3].split()[2])
 
             # Collect the engergy boundaries
             lines_energy_bound = math.ceil((num_neutron_groups+1) / 5)
@@ -48,73 +50,54 @@ class Plots():
                 # Grab the additional data available
                 integral_value = float(lines[line_start+3].split()[0])
                 integral_stdev = float(lines[line_start+3].split()[1])
-                self.extra_data[(nuclide, interaction, unit_region, 'integral_value')] = integral_value
-                self.extra_data[(nuclide, interaction, unit_region, 'integral_stdev')] = integral_stdev
+                data[(experiment, nuclide, interaction, unit_region, 'integral')] = integral_value
+                data[(experiment, nuclide, interaction, unit_region, 'integral std dev')] = integral_stdev
 
                 # Place the sensitivities and standard deviations into the dictionary
                 sens = ''.join(lines[line_start+4 : line_start+4+lines_values]).split()
-                sensitivities[(nuclide, interaction, unit_region, 'sensitivity')] = np.array(sens, dtype=float)
+                data[(experiment, nuclide, interaction, unit_region, 'sensitivity')] = np.array(sens, dtype=float)
                 stdevs = ''.join(lines[line_start+4+lines_values : line_start+lines_profile]).split()
-                sensitivities[(nuclide, interaction, unit_region, 'std dev')] = np.array(stdevs, dtype=float)
+                data[(experiment, nuclide, interaction, unit_region, 'std dev')] = np.array(stdevs, dtype=float)
 
-        # Create the dataframe indexed by energy groups
-        self.df = pd.DataFrame(sensitivities, index=energy_bounds)
-        # Name the idices and columns
-        self.df.index.name = 'energy bounds (ev)'
-        self.df.columns.names = ['isotope', 'reaction', '(unit, region)', '']
+        # Create or append the dataframe indexed by energy groups
+        if self.df is None:
+            self.df = pd.DataFrame(data, index=energy_bounds)
+            # Name the idices and columns
+            self.df.index.name = 'energy bounds (ev)'
+            self.df.columns.names = ['experiment', 'isotope', 'reaction', '(unit, region)', '']
+        else:
+            # Concatenate current DataFrame with new DataFrame
+            new_df = pd.DataFrame(data, index=energy_bounds)
+            self.df = pd.concat([self.df, new_df], axis=1)
         return self.df
 
     def sensitivity_plot(self, keys, plot_std_dev=True):
         '''Plot the sensitivites for the given isotopes, reactions,
         unit numbers, and region numbers. Creates a matplotlib.pyplot
         step plot for the energy bounds from the DataFrame.
+
+        Default unit and region number are (0,0)
         '''
         # Collect the energy bounds (x-axis)
-        energy_bounds = []
+        energy_bounds = np.array([], dtype=float)
         for bound in self.df.index:
-            energy_bounds.append(float(bound.split(':')[0]))
-            energy_bounds.append(float(bound.split(':')[1]))
+            # Add the high and low bounds to energy bounds
+            ehigh = float(bound.split(':')[0])
+            elow = float(bound.split(':')[1])
+            energy_bounds = np.append(energy_bounds, [ehigh, elow])
 
-        i = 0
-        colors = ['g', 'r', 'c', 'm', 'k', 'y']
-        legends = []
-        for key in keys:
-            # Collect the sensitvities and standard deviations
-            sens = self.df[key[0]][key[1]][key[2]]['sensitivity']
-            stdevs = self.df[key[0]][key[1]][key[2]]['std dev']
+        ylabel = 'Sensitivity'
+        title = 'tbd'
 
-            # Make each sensitivity appear twice for step feature
-            sens_step = []
-            for sen in sens:
-                sens_step.append(sen)
-                sens_step.append(sen)
-
-            # Plot the sensitivity and increment color variable
-            plt.plot(energy_bounds, sens_step, linestyle='-', color=colors[i])
-            # Save the legend title
-            # This will be less ugly when I add these to the df
-            integral_value = self.extra_data[tuple((' '.join(key)+' integral_value').split())]
-            integral_stdev = self.extra_data[tuple((' '.join(key)+' integral_stdev').split())]
-            legend_title = '{}\nIntegral Value = {} +/- {}'.format(key[0], integral_value, integral_stdev)
-            legends.append(legend_title)
-            i += 1
-            # If standard deviation is desired then plot the bars
-            if plot_std_dev:
-                plotline, caps, eb = plt.errorbar(energy_bounds[1::2], sens, yerr=stdevs, fmt='none', ecolor='b', elinewidth=1, capsize=2, capthick=1)
-                eb[0].set_linestyle(':')
-        # Final plot settings
-        plt.legend(legends)
-        plt.xscale('log')
-        plt.xlabel('Energy (eV)')
-        plt.ylabel('Sensitivity')
-        plt.title('tbd')
-        plt.grid()
-        plt.show()
+        # Send the data to the plot making function
+        self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, title)
     
     def sensitivity_lethargy_plot(self, keys, plot_std_dev=True):
-        '''Plot the sensitivites for the given isotopes, reactions,
-        unit numbers, and region numbers. Creates a matplotlib.pyplot
+        '''Plot the sensitivites per unit lethargy for the given isotopes,
+        reactions, unit numbers, and region numbers. Creates a matplotlib.pyplot
         step plot for the energy bounds from the DataFrame.
+
+        Default unit and region number are (0,0)
         '''
         # Collect the energy bounds (x-axis)
         energy_bounds = np.array([], dtype=float)
@@ -127,19 +110,31 @@ class Plots():
 
             # Calculate the lethargies for each energy grouping
             lethargies = np.append(lethargies, math.log(ehigh/elow, 10))
+        
+        ylabel = 'Sensitivity per unit lethargy'
+        title = 'tbd'
+        
+        # Send the data to the plot making function
+        self.__make_plot(keys, energy_bounds, ylabel, title, plot_std_dev, lethargies)
 
-
+    def __make_plot(self, keys, energy_bounds, ylabel, title, plot_std_dev, lethargies=None):
+        '''The parts of making a plot that are repeated.'''
         i = 0
         colors = ['g', 'r', 'c', 'm', 'k', 'y']
         legends = []
         for key in keys:
-            # Collect the sensitvities and standard deviations
-            sens = np.array(self.df[key[0]][key[1]][key[2]]['sensitivity'], dtype=float)
-            stdevs = np.array(self.df[key[0]][key[1]][key[2]]['std dev'], dtype=float)
+            # Add unit and region numbers of 0 if none given
+            if len(key) == 3:
+                key.append('(0,0)')
 
-            # Calculate the sensitivities per lethargy
-            sens = sens/lethargies
-            stdevs = stdevs/lethargies
+            # Collect the sensitvities and standard deviations
+            sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'], dtype=float)
+            stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'], dtype=float)
+
+            # Calculate the sensitivities per lethargy if passed in
+            if lethargies is not None:
+                sens = sens/lethargies
+                stdevs = stdevs/lethargies
 
             # Make each sensitivity appear twice for step feature
             sens_step = []
@@ -148,11 +143,11 @@ class Plots():
                 sens_step.append(sen)
 
             # Plot the sensitivity and increment color variable
-            plt.plot(energy_bounds, sens_step, linestyle='-', color=colors[i])
+            plt.plot(energy_bounds, sens_step, linestyle='-', color=colors[i], linewidth=1)
             # Save the legend title
             # This will be less ugly when I add these to the df
-            integral_value = self.extra_data[tuple((' '.join(key)+' integral_value').split())]
-            integral_stdev = self.extra_data[tuple((' '.join(key)+' integral_stdev').split())]
+            integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
+            integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
             legend_title = '{}\nIntegral Value = {} +/- {}'.format(key[0], integral_value, integral_stdev)
             legends.append(legend_title)
             i += 1
@@ -164,8 +159,8 @@ class Plots():
         plt.legend(legends)
         plt.xscale('log')
         plt.xlabel('Energy (eV)')
-        plt.ylabel('Sensitivity')
-        plt.title('tbd')
+        plt.ylabel(ylabel)
+        plt.title(title)
         plt.grid()
         plt.show()
 
@@ -173,5 +168,6 @@ class Plots():
 if __name__ == '__main__':
     plots = Plots()
     plots.sdf_to_df('KENO_slovenia_tsunami.sdf')
-    keys = [('h-1', 'total', '(0,0)'),('h-1', 'elastic', '(0,0)'),('h-1', 'capture', '(0,0)')]
+    plots.sdf_to_df('KENO_UWNR_tsunami.sdf')
+    keys = [['KENO_slovenia_tsunami', 'zr90-zr5h8', 'total'],['KENO_UWNR_tsunami', 'zr90-zr5h8', 'elastic']]
     plots.sensitivity_lethargy_plot(keys)
