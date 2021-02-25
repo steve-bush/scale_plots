@@ -4,13 +4,28 @@ import math
 import matplotlib.pyplot as plt
 
 class Plots():
+    '''Object that contains the functions needed
+    to parse and plot the data from a sdf file.
+    '''
 
     def __init__(self):
         self.df = None
 
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
-        a pandas df
+        a pandas DataFrame.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the sdf file to parse
+        
+        Returns
+        -------
+        df : pandas.DataFrame
+            DataFrame containing all of the data 
+            needed for plotting from the sdf file.
+
         '''
         data = {}
         experiment = filename[:-4]
@@ -76,7 +91,17 @@ class Plots():
         unit numbers, and region numbers. Creates a matplotlib.pyplot
         step plot for the energy bounds from the DataFrame.
 
-        Default unit and region number are (0,0)
+        Default unit and region number are (0,0).
+
+        Parameters
+        ----------
+        keys : list of lists
+            Indices in the pandas DataFrame where the desired
+            sensitivities are stored.
+        plot_std_dev : bool, optional
+            Whether the user wants the error bars to be included
+            in the generated plot. Defaults to True.
+
         '''
         # Collect the energy bounds (x-axis)
         energy_bounds = np.array([], dtype=float)
@@ -87,7 +112,7 @@ class Plots():
             energy_bounds = np.append(energy_bounds, [ehigh, elow])
 
         ylabel = 'Sensitivity'
-        title = 'tbd'
+        title = 'title'
 
         # Send the data to the plot making function
         self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, title)
@@ -97,7 +122,17 @@ class Plots():
         reactions, unit numbers, and region numbers. Creates a matplotlib.pyplot
         step plot for the energy bounds from the DataFrame.
 
-        Default unit and region number are (0,0)
+        Default unit and region number are (0,0).
+
+        Parameters
+        ----------
+        keys : list of lists
+            Indices in the pandas DataFrame where the desired
+            sensitivities are stored.
+        plot_std_dev : bool, optional
+            Whether the user wants the error bars to be included
+            in the generated plot. Defaults to True.
+
         '''
         # Collect the energy bounds (x-axis)
         energy_bounds = np.array([], dtype=float)
@@ -112,7 +147,7 @@ class Plots():
             lethargies = np.append(lethargies, math.log(ehigh/elow, 10))
         
         ylabel = 'Sensitivity per unit lethargy'
-        title = 'tbd'
+        title = 'title'
         
         # Send the data to the plot making function
         self.__make_plot(keys, energy_bounds, ylabel, title, plot_std_dev, lethargies)
@@ -148,7 +183,7 @@ class Plots():
             # This will be less ugly when I add these to the df
             integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
             integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
-            legend_title = '{}\nIntegral Value = {} +/- {}'.format(key[0], integral_value, integral_stdev)
+            legend_title = '{}\nIntegral Value = {} +/- {}'.format(' '.join(key), integral_value, integral_stdev)
             legends.append(legend_title)
             i += 1
             # If standard deviation is desired then plot the bars
@@ -163,11 +198,3 @@ class Plots():
         plt.title(title)
         plt.grid()
         plt.show()
-
-
-if __name__ == '__main__':
-    plots = Plots()
-    plots.sdf_to_df('KENO_slovenia_tsunami.sdf')
-    plots.sdf_to_df('KENO_UWNR_tsunami.sdf')
-    keys = [['KENO_slovenia_tsunami', 'zr90-zr5h8', 'total'],['KENO_UWNR_tsunami', 'zr90-zr5h8', 'elastic']]
-    plots.sensitivity_lethargy_plot(keys)
