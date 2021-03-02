@@ -28,16 +28,16 @@ class Plots():
 
         '''
         data = {}
-        experiment = filename[:-4]
+        experiment = filename[:-4].split('/')[-1]
         with open(filename, 'r') as file:
             lines = file.readlines()
 
             # Read in the header data
             num_neutron_groups = int(lines[1].split()[0])
             num_sens_profiles = int(lines[2].split()[0])
-            num_nuc_integrated = int(lines[2].split()[5])
-            data[(experiment, 'keff', 'value')] = float(lines[3].split()[0])
-            data[(experiment, 'keff', 'std dev')] = float(lines[3].split()[2])
+            #num_nuc_integrated = int(lines[2].split()[5])
+            #data[(experiment, 'keff', 'value')] = float(lines[3].split()[0])
+            #data[(experiment, 'keff', 'std dev')] = float(lines[3].split()[2])
 
             # Collect the engergy boundaries
             lines_energy_bound = math.ceil((num_neutron_groups+1) / 5)
