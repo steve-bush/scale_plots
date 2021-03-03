@@ -16,7 +16,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
     def __init__(self):
         PyQt5.QtWidgets.QMainWindow.__init__(self)
-        
+
         # Grab the plots object
         self.plots = scale_plots.Plots()
         self.filenames = []
@@ -41,7 +41,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.layout.addWidget(self.grid_widget)
         self.widget.setLayout(self.layout)
         self.setCentralWidget(self.widget)
-		
+
     def parse_file(self):
         # Let the user pick the sdf file to read in
         filename = PyQt5.QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', self.cwd)[0]
@@ -58,13 +58,14 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.grid_layout.addWidget(self.file_select, row+1, 0)
             self.grid_layout.addWidget(self.select_data, row+2, 0)
 
-    
     def setup_plot_data(self):
         # Remove the widgets from the file selection part of the gui
-        for filename in self.filenames:
-            self.grid_delete(filename)
-        self.grid_delete(self.file_select)
-        self.grid_delete(self.select_data)
+        if self.filenames != []:
+            for filename in self.filenames:
+                self.grid_delete(filename)
+            self.grid_delete(self.file_select)
+            self.grid_delete(self.select_data)
+            self.filenames = []
 
         # Create labels for drop down menus
         exp_label = PyQt5.QtWidgets.QLabel('Experiment')
@@ -101,7 +102,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.iso_box.addItems(sorted(set(isos)))
         self.iso_box.activated.connect(self.update_inter_box)
         self.grid_layout.addWidget(self.iso_box, len(self.keys)+1, 1)
-        
+
         # Create the drop down menu for the interactions
         self.inter_box = PyQt5.QtWidgets.QComboBox()
         inters = []
@@ -139,7 +140,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.iso_box.addItems(sorted(set(isos)))
         # Update the interactions drop down
         self.update_inter_box()
-    
+
     def update_inter_box(self):
         # Update the available options in the interactions drop down 
         self.inter_box.clear()
@@ -162,7 +163,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
                     if self.inter_box.currentText() == column[2]:
                         unit_regs.append(column[3])
         self.unit_reg_box.addItems(sorted(set(unit_regs), reverse=True))
-    
+
     def add_clicked(self):
         # For each drop down menu
         key = []
@@ -175,36 +176,53 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             label = PyQt5.QtWidgets.QLabel(key[i])
             self.grid_layout.addWidget(label, len(self.keys)+1, i)
             self.labels.append(label)
-        
+
         # Remove the add button
         self.grid_delete(self.add_button)
-        
+
         # Add the key to the keys list
         self.keys.append(key)
         self.make_boxes()
 
-        # Add the start plotting button
+        # Add the start plotting and clear button
         if self.start_plotting_btn is None:
+            self.reset_btn = PyQt5.QtWidgets.QPushButton('Reset All')
+            self.reset_btn.clicked.connect(self.reset_clicked)
+            self.layout.addWidget(self.reset_btn)
+
             self.start_plotting_btn = PyQt5.QtWidgets.QPushButton('Start Plotting')
             self.start_plotting_btn.clicked.connect(self.create_plot)
             self.layout.addWidget(self.start_plotting_btn)
-        
-    def create_plot(self):
+
+    def reset_clicked(self):
+        # If the reset button is clicked
+        self.clear_plot_data()
+        self.setup_plot_data()
+
+    def clear_plot_data(self):
         # Remove all uneeded widgets
         for box in [self.exp_box, self.iso_box, self.inter_box, self.unit_reg_box]:
             self.grid_delete(box)
         for label in self.labels:
             self.grid_delete(label)
         self.grid_delete(self.add_button)
-        self.layout.removeWidget(self.start_plotting_btn)
-        self.start_plotting_btn.deleteLater()
-        self.start_plotting_btn = None
+        self.layout_delete(self.reset_btn)
+        self.layout_delete(self.start_plotting_btn)
 
+    def create_plot(self):
+        self.clear_plot_data()
         self.welcome = PyQt5.QtWidgets.QLabel('Plot goes here')
         self.layout.addWidget(self.welcome, 0)
-    
+
     def grid_delete(self, widget):
+        # Deletes a widget from the grid layout object
         self.grid_layout.removeWidget(widget)
+        widget.deleteLater()
+        widget = None
+
+    def layout_delete(self, widget):
+        # Deletes a widget from the layout object
+        self.layout.removeWidget(widget)
         widget.deleteLater()
         widget = None
 
