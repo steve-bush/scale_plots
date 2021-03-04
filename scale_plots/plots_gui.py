@@ -1,15 +1,8 @@
 import PyQt5
 import PyQt5.QtWidgets
-import PyQt5.QtGui
 import sys
 import os
-import numpy as np
-import matplotlib
-import matplotlib.figure
-matplotlib.use('Qt5agg')
-import matplotlib.backends.backend_qt5agg
 import scale_plots
-
 
 
 class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
@@ -25,22 +18,23 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.grid_widget = PyQt5.QtWidgets.QWidget()
         self.widget = PyQt5.QtWidgets.QWidget()
 
-        # Create the button to select the sdf file
+        # Create grid and box layout
         self.grid_layout = PyQt5.QtWidgets.QGridLayout()
-        self.file_select = PyQt5.QtWidgets.QPushButton('Select File')
-        self.file_select.clicked.connect(self.parse_file)
-        self.grid_layout.addWidget(self.file_select, 0, 0)
-
-        # Create the button to start plotting
-        self.select_data = PyQt5.QtWidgets.QPushButton('Select Plotting Data')
-        self.select_data.clicked.connect(self.setup_plot_data)
-
-        # Setup the file selet menu
         self.grid_widget.setLayout(self.grid_layout)
         self.layout = PyQt5.QtWidgets.QVBoxLayout()
-        self.layout.addWidget(self.grid_widget)
+
+        # Create the file select button
+        self.file_select_btn = PyQt5.QtWidgets.QPushButton('Select New File')
+        self.file_select_btn.clicked.connect(self.parse_file)
+        self.layout.addWidget(self.file_select_btn, 0)
+
+        # Create the button to select data for plotting
+        self.select_data_btn = PyQt5.QtWidgets.QPushButton('Pick Data to Plot')
+        self.select_data_btn.clicked.connect(self.setup_plot_data)
+
+        # Setup the file selet menu
         self.widget.setLayout(self.layout)
-        self.setCentralWidget(self.widget)
+        self.setCentralWidget(self.widget)        
 
     def parse_file(self):
         # Let the user pick the sdf file to read in
@@ -51,21 +45,23 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
             # Update the widget to show the filename
             row = len(self.filenames)
-            self.grid_layout.removeWidget(self.file_select)
+            self.grid_layout.removeWidget(self.file_select_btn)
             file_name = PyQt5.QtWidgets.QLabel(filename)
-            self.grid_layout.addWidget(file_name, row, 0)
+            self.layout.addWidget(file_name, row)
             self.filenames.append(file_name)
-            self.grid_layout.addWidget(self.file_select, row+1, 0)
-            self.grid_layout.addWidget(self.select_data, row+2, 0)
+            self.layout.addWidget(self.file_select_btn, row+1)
+            self.layout.addWidget(self.select_data_btn, row+2)
 
     def setup_plot_data(self):
         # Remove the widgets from the file selection part of the gui
         if self.filenames != []:
             for filename in self.filenames:
-                self.grid_delete(filename)
-            self.grid_delete(self.file_select)
-            self.grid_delete(self.select_data)
+                self.layout_delete(filename)
+            self.layout_delete(self.file_select_btn)
+            self.layout_delete(self.select_data_btn)
             self.filenames = []
+
+        self.layout.addWidget(self.grid_widget)
 
         # Create labels for drop down menus
         exp_label = PyQt5.QtWidgets.QLabel('Experiment')
@@ -76,11 +72,14 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.grid_layout.addWidget(inter_label, 0, 2)
         unit_reg_label = PyQt5.QtWidgets.QLabel('(Unit,Region)')
         self.grid_layout.addWidget(unit_reg_label, 0, 3)
-        self.labels = [exp_label, iso_label, inter_label, unit_reg_label]
+        legend_entry_label = PyQt5.QtWidgets.QLabel('Legend Entry')
+        self.grid_layout.addWidget(legend_entry_label, 0, 4)
+        self.labels = [exp_label, iso_label, inter_label, unit_reg_label, legend_entry_label]
 
         # Create the experiment drop down menus
         self.keys = []
-        self.start_plotting_btn = None
+        self.legend_entry_edits = {}
+        self.create_btns = True
         self.make_boxes()
     
     def make_boxes(self):
@@ -177,6 +176,12 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.grid_layout.addWidget(label, len(self.keys)+1, i)
             self.labels.append(label)
 
+        # Create the legend entry text edit
+        legend_title = ' '.join(key)
+        legend_entry_edit = PyQt5.QtWidgets.QLineEdit(legend_title)
+        self.grid_layout.addWidget(legend_entry_edit, len(self.keys)+1, 4)
+        self.legend_entry_edits[tuple(key)] = legend_entry_edit
+
         # Remove the add button
         self.grid_delete(self.add_button)
 
@@ -184,20 +189,54 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.keys.append(key)
         self.make_boxes()
 
-        # Add the start plotting and clear button
-        if self.start_plotting_btn is None:
-            self.reset_btn = PyQt5.QtWidgets.QPushButton('Reset All')
-            self.reset_btn.clicked.connect(self.reset_clicked)
-            self.layout.addWidget(self.reset_btn)
+        # If the add button is clicked for the first time
+        if self.create_btns:
+            # Create the check box for plotting error bars
+            self.error_bar_check = PyQt5.QtWidgets.QCheckBox('Plot Errorbars')
+            self.error_bar_check.toggle()
+            self.layout.addWidget(self.error_bar_check)
 
-            self.start_plotting_btn = PyQt5.QtWidgets.QPushButton('Start Plotting')
-            self.start_plotting_btn.clicked.connect(self.create_plot)
-            self.layout.addWidget(self.start_plotting_btn)
+            # Create the reset button
+            self.plot_data_reset_btn = PyQt5.QtWidgets.QPushButton('Reset All')
+            self.plot_data_reset_btn.clicked.connect(self.plot_data_reset_clicked)
+            self.layout.addWidget(self.plot_data_reset_btn)
 
-    def reset_clicked(self):
-        # If the reset button is clicked
+            # Create the sensitivities plot button
+            self.plot_sens_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities')
+            self.plot_sens_btn.clicked.connect(self.plot_sens)
+            self.layout.addWidget(self.plot_sens_btn)
+
+            # Create the sensitivities per lethargy button
+            self.plot_per_lethargy_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities per Unit Lethargy')
+            self.plot_per_lethargy_btn.clicked.connect(self.plot_sens_per_lethargy)
+            self.layout.addWidget(self.plot_per_lethargy_btn)
+
+            self.create_btns = False
+
+    def plot_data_reset_clicked(self):
+        # Setup GUI to select new data
         self.clear_plot_data()
         self.setup_plot_data()
+
+    def plot_sens(self):
+        # Collect the legend line edits
+        legend_entries = {}
+        for key, legend_edit in self.legend_entry_edits.items():
+            legend_entries[key] = legend_edit.text()
+        # Check whether the error should be plotted
+        error_flag = self.error_bar_check.isChecked()
+        # Make new window of the sensitivity plot
+        self.plots.sensitivity_plot(self.keys, plot_std_dev=error_flag,legend_dict=legend_entries)
+
+    def plot_sens_per_lethargy(self):
+        # Collect the legend line edits
+        legend_entries = {}
+        for key, legend_edit in self.legend_entry_edits.items():
+            legend_entries[key] = legend_edit.text()
+        # Check whether the error should be plotted
+        error_flag = self.error_bar_check.isChecked()
+        # Make new window of the sensitivity plot
+        self.plots.sensitivity_lethargy_plot(self.keys, plot_std_dev=error_flag, legend_dict=legend_entries)
 
     def clear_plot_data(self):
         # Remove all uneeded widgets
@@ -205,14 +244,13 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.grid_delete(box)
         for label in self.labels:
             self.grid_delete(label)
+        for key in self.legend_entry_edits:
+            self.grid_delete(self.legend_entry_edits[key])
         self.grid_delete(self.add_button)
-        self.layout_delete(self.reset_btn)
-        self.layout_delete(self.start_plotting_btn)
-
-    def create_plot(self):
-        self.clear_plot_data()
-        self.welcome = PyQt5.QtWidgets.QLabel('Plot goes here')
-        self.layout.addWidget(self.welcome, 0)
+        self.layout_delete(self.error_bar_check)
+        self.layout_delete(self.plot_data_reset_btn)
+        self.layout_delete(self.plot_sens_btn)
+        self.layout_delete(self.plot_per_lethargy_btn)
 
     def grid_delete(self, widget):
         # Deletes a widget from the grid layout object
