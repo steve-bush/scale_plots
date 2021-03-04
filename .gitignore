@@ -108,3 +108,7 @@ ENV/
 
 # Input file
 *.sdf
+
+# Pictures
+*.png
+*.jpg

@@ -28,16 +28,16 @@ class Plots():
 
         '''
         data = {}
-        experiment = filename[:-4]
+        experiment = filename[:-4].split('/')[-1]
         with open(filename, 'r') as file:
             lines = file.readlines()
 
             # Read in the header data
             num_neutron_groups = int(lines[1].split()[0])
             num_sens_profiles = int(lines[2].split()[0])
-            num_nuc_integrated = int(lines[2].split()[5])
-            data[(experiment, 'keff', 'value')] = float(lines[3].split()[0])
-            data[(experiment, 'keff', 'std dev')] = float(lines[3].split()[2])
+            #num_nuc_integrated = int(lines[2].split()[5])
+            #data[(experiment, 'keff', 'value')] = float(lines[3].split()[0])
+            #data[(experiment, 'keff', 'std dev')] = float(lines[3].split()[2])
 
             # Collect the engergy boundaries
             lines_energy_bound = math.ceil((num_neutron_groups+1) / 5)
@@ -86,7 +86,7 @@ class Plots():
             self.df = pd.concat([self.df, new_df], axis=1)
         return self.df
 
-    def sensitivity_plot(self, keys, plot_std_dev=True):
+    def sensitivity_plot(self, keys, plot_std_dev=True, legend_dict=None):
         '''Plot the sensitivites for the given isotopes, reactions,
         unit numbers, and region numbers. Creates a matplotlib.pyplot
         step plot for the energy bounds from the DataFrame.
@@ -101,6 +101,9 @@ class Plots():
         plot_std_dev : bool, optional
             Whether the user wants the error bars to be included
             in the generated plot. Defaults to True.
+        legend_dict : dictionary, optional
+            keys : key in the keys list of the selected isotope
+            value : string to replace the automatically generated legend
 
         '''
         # Collect the energy bounds (x-axis)
@@ -112,12 +115,11 @@ class Plots():
             energy_bounds = np.append(energy_bounds, [ehigh, elow])
 
         ylabel = 'Sensitivity'
-        title = 'title'
 
         # Send the data to the plot making function
-        self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, title)
-    
-    def sensitivity_lethargy_plot(self, keys, plot_std_dev=True):
+        self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, legend_dict, None)
+
+    def sensitivity_lethargy_plot(self, keys, plot_std_dev=True, legend_dict=None):
         '''Plot the sensitivites per unit lethargy for the given isotopes,
         reactions, unit numbers, and region numbers. Creates a matplotlib.pyplot
         step plot for the energy bounds from the DataFrame.
@@ -132,6 +134,9 @@ class Plots():
         plot_std_dev : bool, optional
             Whether the user wants the error bars to be included
             in the generated plot. Defaults to True.
+        legend_dict : dictionary, optional
+            keys : key in the keys list of the selected isotope
+            value : string to replace the automatically generated legend
 
         '''
         # Collect the energy bounds (x-axis)
@@ -145,19 +150,26 @@ class Plots():
 
             # Calculate the lethargies for each energy grouping
             lethargies = np.append(lethargies, math.log(ehigh/elow, 10))
-        
-        ylabel = 'Sensitivity per unit lethargy'
-        title = 'title'
-        
-        # Send the data to the plot making function
-        self.__make_plot(keys, energy_bounds, ylabel, title, plot_std_dev, lethargies)
 
-    def __make_plot(self, keys, energy_bounds, ylabel, title, plot_std_dev, lethargies=None):
+        ylabel = 'Sensitivity per unit lethargy'
+
+        # Send the data to the plot making function
+        self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, legend_dict, lethargies)
+
+    def __make_plot(self, keys, energy_bounds, ylabel, plot_std_dev, legend_dict, lethargies):
         '''The parts of making a plot that are repeated.'''
         i = 0
         colors = ['g', 'r', 'c', 'm', 'k', 'y']
         legends = []
         for key in keys:
+            # Create the legend title
+            if legend_dict is None:
+                # If no legend was passed in create one
+                legend_title = ' '.join(tuple(key))
+            else:
+                # If legend titles were passed in then use them
+                legend_title = legend_dict[tuple(key)]
+
             # Add unit and region numbers of 0 if none given
             if len(key) == 3:
                 key.append('(0,0)')
@@ -179,12 +191,13 @@ class Plots():
 
             # Plot the sensitivity and increment color variable
             plt.plot(energy_bounds, sens_step, linestyle='-', color=colors[i], linewidth=1)
-            # Save the legend title
-            # This will be less ugly when I add these to the df
+
+            # Add the integral value information
             integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
             integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
-            legend_title = '{}\nIntegral Value = {} +/- {}'.format(' '.join(key), integral_value, integral_stdev)
+            legend_title += '\nIntegral Value = {} +/- {}'.format(integral_value, integral_stdev)
             legends.append(legend_title)
+
             i += 1
             # If standard deviation is desired then plot the bars
             if plot_std_dev:
@@ -195,6 +208,6 @@ class Plots():
         plt.xscale('log')
         plt.xlabel('Energy (eV)')
         plt.ylabel(ylabel)
-        plt.title(title)
-        plt.grid()
+        plt.title('title')
+        plt.grid(b=True)
         plt.show()

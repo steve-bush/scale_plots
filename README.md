@@ -27,6 +27,9 @@ Default unit and region number are (0,0).
 Parameters:
 * **keys** (list of lists) - Indices in the pandas DataFrame where the desired sensitivities are stored.
 * **plot_std_dev** (bool, *optional*) - Whether the user wants the error bars to be included in the generated plot. Defaults to True.
+* **legend_dict** (dictionary, *optional*)
+keys : key in the keys list of the selected isotope
+value : string to replace the automatically generated legend
 
 ##### `sensitivity_lethargy_plot(keys, plot_std_dev=True)`
 Plot the sensitivity per unit lethargy of the given `keys` from the pandas DataFrame stored in `scale_plots.Plots()`
@@ -35,3 +38,6 @@ Default unit and region number are (0,0).
 Parameters:
 * **keys** (list of lists) - Indices in the pandas DataFrame where the desired sensitivities are stored.
 * **plot_std_dev** (bool, *optional*) - Whether the user wants the error bars to be included in the generated plot. Defaults to True.
+* * **legend_dict** (dictionary, *optional*)
+keys : key in the keys list of the selected isotope
+value : string to replace the automatically generated legend
