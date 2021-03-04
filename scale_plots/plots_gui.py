@@ -1,5 +1,6 @@
 import PyQt5
 import PyQt5.QtWidgets
+import matplotlib.pyplot as plt
 import sys
 import os
 import scale_plots
@@ -225,6 +226,8 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             legend_entries[key] = legend_edit.text()
         # Check whether the error should be plotted
         error_flag = self.error_bar_check.isChecked()
+        # Stops 'QCoreApplication::exec: The event loop is already running' warning
+        plt.ion()
         # Make new window of the sensitivity plot
         self.plots.sensitivity_plot(self.keys, plot_std_dev=error_flag,legend_dict=legend_entries)
 
@@ -235,6 +238,8 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             legend_entries[key] = legend_edit.text()
         # Check whether the error should be plotted
         error_flag = self.error_bar_check.isChecked()
+        # Stops 'QCoreApplication::exec: The event loop is already running' warning
+        plt.ion()
         # Make new window of the sensitivity plot
         self.plots.sensitivity_lethargy_plot(self.keys, plot_std_dev=error_flag, legend_dict=legend_entries)
 

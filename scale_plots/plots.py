@@ -158,12 +158,18 @@ class Plots():
 
     def __make_plot(self, keys, energy_bounds, ylabel, plot_std_dev, legend_dict, lethargies):
         '''The parts of making a plot that are repeated.'''
-        # Stops 'QCoreApplication::exec: The event loop is already running' warning
-        plt.ion()
         i = 0
         colors = ['g', 'r', 'c', 'm', 'k', 'y']
         legends = []
         for key in keys:
+            # Create the legend title
+            if legend_dict is None:
+                # If no legend was passed in create one
+                legend_title = ' '.join(tuple(key))
+            else:
+                # If legend titles were passed in then use them
+                legend_title = legend_dict[tuple(key)]
+
             # Add unit and region numbers of 0 if none given
             if len(key) == 3:
                 key.append('(0,0)')
@@ -186,13 +192,6 @@ class Plots():
             # Plot the sensitivity and increment color variable
             plt.plot(energy_bounds, sens_step, linestyle='-', color=colors[i], linewidth=1)
 
-            # Create the legend title
-            if legend_dict is None:
-                # If no legend was passed in create one
-                legend_title = ' '.join(key)
-            else:
-                # If legend titles were passed in then use them
-                legend_title = legend_dict[tuple(key)]
             # Add the integral value information
             integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
             integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
