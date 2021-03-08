@@ -86,6 +86,28 @@ class Plots():
             self.df = pd.concat([self.df, new_df], axis=1)
         return self.df
 
+    def get_integral(self, key):
+        # Collect the dx values
+        dxs = np.array([], dtype=float)
+        lethargies = np.array([], dtype=float)
+        for bound in self.df.index:
+            # Add the high and low bounds to energy bounds
+            ehigh = float(bound.split(':')[0])
+            elow = float(bound.split(':')[1])
+            dxs = np.append(dxs, ehigh - elow)
+
+            # Calculate the lethargies for each energy grouping
+            lethargies = np.append(lethargies, math.log(ehigh/elow))
+
+        # Collect the sensitivites and uncertainties
+        sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'], dtype=float)
+        stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'], dtype=float)
+
+        value = np.sum(sens*dxs)
+        stdev = np.sum(stdevs*dxs)
+
+        return value, stdev
+
     def sensitivity_plot(self, keys, plot_std_dev=True, legend_dict=None):
         '''Plot the sensitivites for the given isotopes, reactions,
         unit numbers, and region numbers. Creates a matplotlib.pyplot
@@ -115,9 +137,10 @@ class Plots():
             energy_bounds = np.append(energy_bounds, [ehigh, elow])
 
         ylabel = 'Sensitivity'
+        lethargies = None
 
         # Send the data to the plot making function
-        self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, legend_dict, None)
+        self.__make_plot(keys, energy_bounds, ylabel, plot_std_dev, legend_dict, lethargies)
 
     def sensitivity_lethargy_plot(self, keys, plot_std_dev=True, legend_dict=None):
         '''Plot the sensitivites per unit lethargy for the given isotopes,
@@ -149,7 +172,7 @@ class Plots():
             energy_bounds = np.append(energy_bounds, [ehigh, elow])
 
             # Calculate the lethargies for each energy grouping
-            lethargies = np.append(lethargies, math.log(ehigh/elow, 10))
+            lethargies = np.append(lethargies, math.log(ehigh/elow))
 
         ylabel = 'Sensitivity per unit lethargy'
 
@@ -158,6 +181,9 @@ class Plots():
 
     def __make_plot(self, keys, energy_bounds, ylabel, plot_std_dev, legend_dict, lethargies):
         '''The parts of making a plot that are repeated.'''
+        # Make sure keys is a list of lists
+        if type(keys[0]) is not list:
+            keys = [keys]
         i = 0
         colors = ['g', 'r', 'c', 'm', 'k', 'y']
         legends = []
@@ -173,6 +199,9 @@ class Plots():
             # Add unit and region numbers of 0 if none given
             if len(key) == 3:
                 key.append('(0,0)')
+            
+            # Raise an error if less than 3 values were passed in
+            assert len(key) > 3, 'Must pass 3 or more identifiers in each key'
 
             # Collect the sensitvities and standard deviations
             sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'], dtype=float)

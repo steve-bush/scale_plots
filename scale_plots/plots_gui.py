@@ -228,6 +228,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         error_flag = self.error_bar_check.isChecked()
         # Stops 'QCoreApplication::exec: The event loop is already running' warning
         plt.ion()
+        plt.clf()
         # Make new window of the sensitivity plot
         self.plots.sensitivity_plot(self.keys, plot_std_dev=error_flag,legend_dict=legend_entries)
 
@@ -240,6 +241,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         error_flag = self.error_bar_check.isChecked()
         # Stops 'QCoreApplication::exec: The event loop is already running' warning
         plt.ion()
+        plt.clf()
         # Make new window of the sensitivity plot
         self.plots.sensitivity_lethargy_plot(self.keys, plot_std_dev=error_flag, legend_dict=legend_entries)
 
