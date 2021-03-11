@@ -16,13 +16,17 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.filenames = []
         self.cwd = os.getcwd()
 
-        self.grid_widget = PyQt5.QtWidgets.QWidget()
+        self.data_grid_widget = PyQt5.QtWidgets.QWidget()
+        self.extra_options_widget = PyQt5.QtWidgets.QWidget()
         self.widget = PyQt5.QtWidgets.QWidget()
 
-        # Create grid and box layout
+        # Create grid layouts
         self.data_add_layout = PyQt5.QtWidgets.QGridLayout()
-        self.grid_widget.setLayout(self.data_add_layout)
+        self.data_grid_widget.setLayout(self.data_add_layout)
+        self.extra_options_layout = PyQt5.QtWidgets.QGridLayout()
+        self.extra_options_widget.setLayout(self.extra_options_layout)
         self.layout = PyQt5.QtWidgets.QGridLayout()
+        self.widget.setLayout(self.layout)
 
         # Create the file select button
         self.file_select_btn = PyQt5.QtWidgets.QPushButton('Select New File')
@@ -34,7 +38,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.select_data_btn.clicked.connect(self.setup_plot_data)
 
         # Setup the file selet menu
-        self.widget.setLayout(self.layout)
         self.setCentralWidget(self.widget)        
 
     def parse_file(self):
@@ -62,7 +65,8 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.layout_delete(self.select_data_btn)
             self.filenames = []
 
-        self.layout.addWidget(self.grid_widget, 0, 0)
+        self.layout.addWidget(self.data_grid_widget, 0, 0)
+        self.layout.addWidget(self.extra_options_widget, 1, 0)
 
         # Create labels for drop down menus
         exp_label = PyQt5.QtWidgets.QLabel('Experiment')
@@ -91,7 +95,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             exps.append(column[0])
         self.exp_box.addItems(sorted(set(exps)))
         self.exp_box.activated.connect(self.update_iso_box)
-        self.data_add_layout.addWidget(self.exp_box, len(self.keys)+1, 0)
+        self.data_add_layout.addWidget(self.exp_box, 1, 0)
 
         # Create the drop down menu for the isotopes
         self.iso_box = PyQt5.QtWidgets.QComboBox()
@@ -101,7 +105,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
                 isos.append(column[1])
         self.iso_box.addItems(sorted(set(isos)))
         self.iso_box.activated.connect(self.update_inter_box)
-        self.data_add_layout.addWidget(self.iso_box, len(self.keys)+1, 1)
+        self.data_add_layout.addWidget(self.iso_box, 1, 1)
 
         # Create the drop down menu for the interactions
         self.inter_box = PyQt5.QtWidgets.QComboBox()
@@ -112,7 +116,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
                     inters.append(column[2])
         self.inter_box.addItems(sorted(set(inters)))
         self.inter_box.activated.connect(self.update_unit_reg_box)
-        self.data_add_layout.addWidget(self.inter_box, len(self.keys)+1, 2)
+        self.data_add_layout.addWidget(self.inter_box, 1, 2)
 
         # Create the drop down menu for the unit region numbers
         self.unit_reg_box = PyQt5.QtWidgets.QComboBox()
@@ -123,12 +127,12 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
                     if self.inter_box.currentText() == column[2]:
                         unit_regs.append(column[3])
         self.unit_reg_box.addItems(sorted(set(unit_regs), reverse=True))
-        self.data_add_layout.addWidget(self.unit_reg_box, len(self.keys)+1, 3)
+        self.data_add_layout.addWidget(self.unit_reg_box, 1, 3)
 
         # Create the add button to enter the key
         self.add_button = PyQt5.QtWidgets.QPushButton('Add')
         self.add_button.clicked.connect(self.add_clicked)
-        self.data_add_layout.addWidget(self.add_button, len(self.keys)+1, 4)
+        self.data_add_layout.addWidget(self.add_button, 1, 4)
 
     def update_iso_box(self):
         # Update the available options in the isotope drop down   
@@ -171,54 +175,77 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         for i in range(len(boxes)):
             # Save the value
             key.append(boxes[i].currentText())
-            # Remove the widget and leave a qlabel in its place
-            self.grid_delete(boxes[i])
+            # Make Qlabels below of the selected data
             label = PyQt5.QtWidgets.QLabel(key[i])
-            self.data_add_layout.addWidget(label, len(self.keys)+1, i)
+            self.data_add_layout.addWidget(label, len(self.keys)+2, i)
             self.labels.append(label)
 
         # Create the legend entry text edit
         legend_title = ' '.join(key)
         legend_entry_edit = PyQt5.QtWidgets.QLineEdit(legend_title)
-        self.data_add_layout.addWidget(legend_entry_edit, len(self.keys)+1, 4)
+        self.data_add_layout.addWidget(legend_entry_edit, len(self.keys)+2, 4)
         self.legend_entry_edits[tuple(key)] = legend_entry_edit
-
-        # Remove the add button
-        self.grid_delete(self.add_button)
 
         # Add the key to the keys list
         self.keys.append(key)
-        self.make_boxes()
 
         # If the add button is clicked for the first time
         if self.create_btns:
             # Create the check box for plotting error bars
             self.error_bar_check = PyQt5.QtWidgets.QCheckBox('Plot Errorbars')
             self.error_bar_check.toggle()
-            self.layout.addWidget(self.error_bar_check, 2, 0)
+            self.extra_options_layout.addWidget(self.error_bar_check, 0, 0)
+
+            # Create the energy bounds boxes and label
+            self.elow_box = PyQt5.QtWidgets.QComboBox()
+            self.ehigh_box = PyQt5.QtWidgets.QComboBox()
+            self.elow_label = PyQt5.QtWidgets.QLabel('Low Energy Bound (eV):')
+            self.ehigh_label = PyQt5.QtWidgets.QLabel('High Energy Bound (eV):')
+            elows = []
+            ehighs = []
+            for bound in self.plots.df.index:
+                # Add the high and low bounds to their list
+                elows.append(float(bound.split(':')[1]))
+                ehighs.append(float(bound.split(':')[0]))
+            # Sort the energy bounds and turn them back into strings
+            elows = [str(e) for e in sorted(elows)]
+            ehighs = [str(e) for e in sorted(ehighs, reverse=True)]
+            self.elow_box.addItems(elows)
+            self.ehigh_box.addItems(ehighs)
+            self.extra_options_layout.addWidget(self.elow_label, 0, 1)
+            self.extra_options_layout.addWidget(self.ehigh_label, 1, 1)
+            self.extra_options_layout.addWidget(self.elow_box, 0, 2)
+            self.extra_options_layout.addWidget(self.ehigh_box, 1, 2)
+
+            # Create the sensitivities plot button
+            self.plot_sens_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities')
+            self.plot_sens_btn.clicked.connect(self.plot_sens)
+            self.layout.addWidget(self.plot_sens_btn, 2, 0)
+
+            # Create the sensitivities per lethargy button
+            self.plot_per_lethargy_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities per Unit Lethargy')
+            self.plot_per_lethargy_btn.clicked.connect(self.plot_sens_per_lethargy)
+            self.layout.addWidget(self.plot_per_lethargy_btn, 3, 0)
 
             # Create the reset button
             self.plot_data_reset_btn = PyQt5.QtWidgets.QPushButton('Reset All')
             self.plot_data_reset_btn.clicked.connect(self.plot_data_reset_clicked)
             self.layout.addWidget(self.plot_data_reset_btn, 4, 0)
 
-            # Create the sensitivities plot button
-            self.plot_sens_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities')
-            self.plot_sens_btn.clicked.connect(self.plot_sens)
-            self.layout.addWidget(self.plot_sens_btn, 5, 0)
-
-            # Create the sensitivities per lethargy button
-            self.plot_per_lethargy_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities per Unit Lethargy')
-            self.plot_per_lethargy_btn.clicked.connect(self.plot_sens_per_lethargy)
-            self.layout.addWidget(self.plot_per_lethargy_btn, 6, 0)
-
             self.create_btns = False
         # If 2 keys then make correlation checking an option
         elif len(self.keys) == 2:
             # Create the check box for showing the correlation
             self.corr_check = PyQt5.QtWidgets.QCheckBox('Show Correlation')
-            self.layout.addWidget(self.corr_check, 3, 0)
+            self.extra_options_layout.addWidget(self.corr_check, 1, 0)
 
+            # Create the label and combo box for correlation text position
+            self.corr_text_pos_label = PyQt5.QtWidgets.QLabel('Correlation Text Position:')
+            self.corr_text_pos_box = PyQt5.QtWidgets.QComboBox()
+            positions = ['Bottom Right', 'Bottom Left', 'Top Right', 'Top Left']
+            self.corr_text_pos_box.addItems(positions)
+            self.extra_options_layout.addWidget(self.corr_text_pos_label, 2, 0)
+            self.extra_options_layout.addWidget(self.corr_text_pos_box, 2, 1)
 
     def plot_data_reset_clicked(self):
         # Setup GUI to select new data
@@ -226,53 +253,71 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.setup_plot_data()
 
     def plot_sens(self):
-        # Collect the legend line edits
-        legend_entries = {}
-        for key, legend_edit in self.legend_entry_edits.items():
-            legend_entries[key] = legend_edit.text()
-        # Check whether the error and correlation should be plotted
-        error_flag = self.error_bar_check.isChecked()
-        corr_flag = self.corr_check.isChecked()
-        # Stops 'QCoreApplication::exec: The event loop is already running' warning
-        plt.ion()
-        plt.clf()
+        # Get plotting data
+        elow, ehigh, error_flag, corr_flag, legend_entries, r_pos = self.preplot()
         # Make new window of the sensitivity plot
-        self.plots.sensitivity_plot(self.keys, plot_std_dev=error_flag, plot_corr=corr_flag, legend_dict=legend_entries)
+        self.plots.sensitivity_plot(self.keys, elow=elow, ehigh=ehigh, plot_std_dev=error_flag,
+                                    plot_corr=corr_flag, legend_dict=legend_entries, r_pos=r_pos)
 
     def plot_sens_per_lethargy(self):
+        # Get plotting data
+        elow, ehigh, error_flag, corr_flag, legend_entries, r_pos = self.preplot()
+        # Make new window of the sensitivity plot
+        self.plots.sensitivity_lethargy_plot(self.keys, elow=elow, ehigh=ehigh, plot_std_dev=error_flag,
+                                             plot_corr=corr_flag, legend_dict=legend_entries, r_pos=r_pos)
+
+    def preplot(self):
+        # Get the high and low bounds
+        elow = float(self.elow_box.currentText())
+        ehigh = float(self.ehigh_box.currentText())
         # Collect the legend line edits
         legend_entries = {}
         for key, legend_edit in self.legend_entry_edits.items():
             legend_entries[key] = legend_edit.text()
         # Check whether the error and correlation should be plotted
         error_flag = self.error_bar_check.isChecked()
-        corr_flag = self.corr_check.isChecked()
+        if len(self.keys) > 1:
+            corr_flag = self.corr_check.isChecked()
+            r_pos = self.corr_text_pos_box.currentText()
+        else:
+            corr_flag = False
+            r_pos = 'bottom right'
         # Stops 'QCoreApplication::exec: The event loop is already running' warning
         plt.ion()
         plt.clf()
-        # Make new window of the sensitivity plot
-        self.plots.sensitivity_lethargy_plot(self.keys, plot_std_dev=error_flag, plot_corr=corr_flag, legend_dict=legend_entries)
+        return elow, ehigh, error_flag, corr_flag, legend_entries, r_pos
 
     def clear_plot_data(self):
         # Remove all uneeded widgets
         for box in [self.exp_box, self.iso_box, self.inter_box, self.unit_reg_box]:
-            self.grid_delete(box)
+            self.data_add_grid_delete(box)
         for label in self.labels:
-            self.grid_delete(label)
+            self.data_add_grid_delete(label)
         for key in self.legend_entry_edits:
-            self.grid_delete(self.legend_entry_edits[key])
-        self.grid_delete(self.add_button)
-        self.layout_delete(self.error_bar_check)
+            self.data_add_grid_delete(self.legend_entry_edits[key])
+        self.data_add_grid_delete(self.add_button)
+        self.extra_options_grid_delete(self.error_bar_check)
+        self.extra_options_grid_delete(self.elow_box)
+        self.extra_options_grid_delete(self.ehigh_box)
+        self.extra_options_grid_delete(self.elow_label)
+        self.extra_options_grid_delete(self.ehigh_label)
+        self.extra_options_grid_delete(self.corr_text_pos_label)
+        self.extra_options_grid_delete(self.corr_text_pos)
         if len(self.keys) > 1:
-            self.layout_delete(self.corr_check)
-        self.layout_delete(self.corr_check)
+            self.extra_options_grid_delete(self.corr_check)
         self.layout_delete(self.plot_data_reset_btn)
         self.layout_delete(self.plot_sens_btn)
         self.layout_delete(self.plot_per_lethargy_btn)
 
-    def grid_delete(self, widget):
-        # Deletes a widget from the grid layout object
+    def data_add_grid_delete(self, widget):
+        # Deletes a widget from the data add object
         self.data_add_layout.removeWidget(widget)
+        widget.deleteLater()
+        widget = None
+
+    def extra_options_grid_delete(self, widget):
+        # Deletes a widget from the extra options object
+        self.extra_options_layout.removeWidget(widget)
         widget.deleteLater()
         widget = None
 
