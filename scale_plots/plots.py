@@ -30,6 +30,8 @@ class Plots():
         '''
         data = {}
         experiment = filename[:-4].split('/')[-1]
+        type_a = False
+        type_b = False
         with open(filename, 'r') as file:
             lines = file.readlines()
 
@@ -52,35 +54,62 @@ class Plots():
             # Number of lines each profile has of sensitivity values
             lines_values = ceil(num_neutron_groups/5)
             # Number of lines each sensitivity profile takes
-            lines_profile = (2 * lines_values + 4)
+            if len(lines[lines_energy_bound + 5].split()) == 6:
+                # Type A
+                lines_profile = lines_values + 2
+                type_a = True
+            elif len(lines[lines_energy_bound + 5].split()) == 4:
+                # Type B
+                lines_profile = 2 * lines_values + 4
+                type_b = True
             # Place the sensitivities into a dictionary of 2xn numpy arrays
             for i in range(num_sens_profiles):
                 # Grab the identifying keys for the sensitivities
-                line_start = lines_energy_bound + 5 + i * lines_profile
-                nuclide = lines[line_start].split()[0]
-                interaction = lines[line_start].split()[1]
-                unit_num = lines[line_start+1].split()[0]
-                region_num = lines[line_start+1].split()[1]
-                unit_region = '({},{})'.format(unit_num, region_num)
+                key_start = lines_energy_bound + 5 + i * lines_profile
+                # Check if the file is type A or type B
+                if type_a:
+                    #  Type A
+                    nuclide = lines[key_start].split()[0]
+                    interaction = lines[key_start].split()[1]
+                    unit_region = lines[key_start].split()[4]
 
-                # Grab the additional data available
-                integral_value = float(lines[line_start+3].split()[0])
-                integral_stdev = float(lines[line_start+3].split()[1])
-                data[(experiment, nuclide, interaction, unit_region, 'integral')] = integral_value
-                data[(experiment, nuclide, interaction, unit_region, 'integral std dev')] = integral_stdev
+                    # Grab the additional data available
+                    integral_value = float(lines[key_start+1].split()[0])
+                    data[(experiment, nuclide, interaction, unit_region, 'integral')] = integral_value
 
-                # Place the sensitivities and standard deviations into the dictionary
-                sens = ''.join(lines[line_start+4 : line_start+4+lines_values]).split()
+                    sens_start = key_start+2
+                elif type_b:
+                    # Type B
+                    nuclide = lines[key_start].split()[0]
+                    interaction = lines[key_start].split()[1]
+                    unit_num = lines[key_start+1].split()[0]
+                    region_num = lines[key_start+1].split()[1]
+                    unit_region = '({},{})'.format(unit_num, region_num)
+
+                    # Grab the additional data available
+                    integral_value = float(lines[key_start+3].split()[0])
+                    integral_stdev = float(lines[key_start+3].split()[1])
+                    data[(experiment, nuclide, interaction, unit_region, 'integral')] = integral_value
+                    data[(experiment, nuclide, interaction, unit_region, 'integral std dev')] = integral_stdev
+
+                    sens_start = key_start+4
+
+                    # Type A has no stdev
+                    stdevs = ''.join(lines[sens_start+lines_values : key_start+lines_profile]).split()
+                    data[(experiment, nuclide, interaction, unit_region, 'std dev')] = np.array(stdevs, dtype=float)
+                # Place the sensitivities into the dictionary
+                sens = ''.join(lines[sens_start : sens_start+lines_values]).split()
                 data[(experiment, nuclide, interaction, unit_region, 'sensitivity')] = np.array(sens, dtype=float)
-                stdevs = ''.join(lines[line_start+4+lines_values : line_start+lines_profile]).split()
-                data[(experiment, nuclide, interaction, unit_region, 'std dev')] = np.array(stdevs, dtype=float)
 
         # Create or append the dataframe indexed by energy groups
         if self.df is None:
             self.df = pd.DataFrame(data, index=energy_bounds)
             # Name the idices and columns
             self.df.index.name = 'energy bounds (ev)'
-            self.df.columns.names = ['experiment', 'isotope', 'reaction', '(unit, region)', '']
+            if type_a:
+                self.df.columns.names = ['experiment', 'isotope', 'reaction', '(unit, region)', '']
+            elif type_b:
+                self.df.columns.names = ['experiment', 'isotope', 'reaction', 'region', '']
         else:
             # Concatenate current DataFrame with new DataFrame
             new_df = pd.DataFrame(data, index=energy_bounds)
@@ -210,6 +239,8 @@ class Plots():
         # Make sure keys is a list of lists
         if type(keys[0]) is not list:
             keys = [keys]
+        # Assert maximum number of keys to plot
+        assert len(keys) < 24, 'Maximum number of keys to plot is 24'
         # Create the text for the correlation
         r_text = ''
         # The energy bounds information
@@ -232,6 +263,7 @@ class Plots():
                     r_text += '\n{} and {} r = {}'.format(key_text1, key_text2, r)
         i = 0
         colors = ['g', 'r', 'c', 'm', 'k', 'y']
+        ls = ['-', '--', '.-', '.']
         legends = []
         for key in keys:
             # Create the legend title
@@ -247,7 +279,13 @@ class Plots():
 
             # Collect the sensitvities and standard deviations
             sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'].loc[indices], dtype=float)
-            stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'].loc[indices], dtype=float)
+            type_b = True
+            try:
+                # Type B files have stdev but not Type A
+                stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'].loc[indices], dtype=float)
+            except:
+                stdevs = 0
+                type_b = False
 
             # Calculate the sensitivities per lethargy if passed in
             if plot_lethargy:
@@ -261,16 +299,23 @@ class Plots():
                 sens_step.append(sen)
 
             # Plot the sensitivity and increment color variable
-            plt.plot(energy_vals, sens_step, linestyle='-', color=colors[i], linewidth=1)
+            plt.plot(energy_vals, sens_step, linestyle=ls[i//6], color=colors[i%6], linewidth=1)
             # If standard deviation is desired then plot the bars
-            if plot_std_dev:
+            if plot_std_dev and type_b:
                 plotline, caps, eb = plt.errorbar(energy_vals[1::2], sens, yerr=stdevs, fmt='none', ecolor='b', elinewidth=1, capsize=2, capthick=1)
                 eb[0].set_linestyle(':')
 
             # Add the integral value information
-            integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
-            integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
-            legend_title += '\nIntegral Value = {} +/- {}'.format(integral_value, integral_stdev)
+            try:
+                # Type B includes integral stdev
+                integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
+                integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
+                legend_title += '\nIntegral Value = {} +/- {}'.format(integral_value, integral_stdev)
+            except:
+                # Type A gives no integral stdev
+                integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
+                legend_title += '\nIntegral Value = {}'.format(integral_value)
+
             legends.append(legend_title)
 
             i += 1
@@ -284,6 +329,7 @@ class Plots():
             ax.text(1, 0, r_text, horizontalalignment='right', verticalalignment='bottom', transform=ax.transAxes)
         else:
             ax.text(0.01, 0, r_text, horizontalalignment='left', verticalalignment='bottom', transform=ax.transAxes)
+
         # Final plot settings
         plt.legend(legends)
         plt.xscale('log')

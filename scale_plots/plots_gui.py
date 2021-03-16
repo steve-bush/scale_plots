@@ -172,22 +172,26 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # For each drop down menu
         key = []
         boxes = [self.exp_box, self.iso_box, self.inter_box, self.unit_reg_box]
-        for i in range(len(boxes)):
+        for box in boxes:
             # Save the value
-            key.append(boxes[i].currentText())
-            # Make Qlabels below of the selected data
-            label = PyQt5.QtWidgets.QLabel(key[i])
-            self.data_add_layout.addWidget(label, len(self.keys)+2, i)
-            self.labels.append(label)
+            key.append(box.currentText())
 
-        # Create the legend entry text edit
-        legend_title = ' '.join(key)
-        legend_entry_edit = PyQt5.QtWidgets.QLineEdit(legend_title)
-        self.data_add_layout.addWidget(legend_entry_edit, len(self.keys)+2, 4)
-        self.legend_entry_edits[tuple(key)] = legend_entry_edit
+        # Do not add the selected reaction if it has already been added
+        if key not in self.keys:
+            # Create the legend entry text edit
+            legend_title = ' '.join(key)
+            legend_entry_edit = PyQt5.QtWidgets.QLineEdit(legend_title)
+            self.data_add_layout.addWidget(legend_entry_edit, len(self.keys)+2, 4)
+            self.legend_entry_edits[tuple(key)] = legend_entry_edit
 
-        # Add the key to the keys list
-        self.keys.append(key)
+            for i in range(len(boxes)):
+                # Make Qlabels below the selected data
+                label = PyQt5.QtWidgets.QLabel(key[i])
+                self.data_add_layout.addWidget(label, len(self.keys)+2, i)
+                self.labels.append(label)
+
+            # Add the key to the keys list
+            self.keys.append(key)
 
         # If the add button is clicked for the first time
         if self.create_btns:
@@ -293,18 +297,18 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.data_add_grid_delete(box)
         for label in self.labels:
             self.data_add_grid_delete(label)
-        for key in self.legend_entry_edits:
-            self.data_add_grid_delete(self.legend_entry_edits[key])
+        for edit in self.legend_entry_edits.values():
+            self.data_add_grid_delete(edit)
         self.data_add_grid_delete(self.add_button)
         self.extra_options_grid_delete(self.error_bar_check)
         self.extra_options_grid_delete(self.elow_box)
         self.extra_options_grid_delete(self.ehigh_box)
         self.extra_options_grid_delete(self.elow_label)
         self.extra_options_grid_delete(self.ehigh_label)
-        self.extra_options_grid_delete(self.corr_text_pos_label)
-        self.extra_options_grid_delete(self.corr_text_pos)
         if len(self.keys) > 1:
             self.extra_options_grid_delete(self.corr_check)
+            self.extra_options_grid_delete(self.corr_text_pos_label)
+            self.extra_options_grid_delete(self.corr_text_pos_box)
         self.layout_delete(self.plot_data_reset_btn)
         self.layout_delete(self.plot_sens_btn)
         self.layout_delete(self.plot_per_lethargy_btn)
