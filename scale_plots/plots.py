@@ -306,14 +306,18 @@ class Plots():
                 eb[0].set_linestyle(':')
 
             # Add the integral value information
+            # Check for NaNs if energy groups differ
             try:
                 # Type B includes integral stdev
-                integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
-                integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][0]
+                integral_value_bools = pd.notnull(self.df[key[0]][key[1]][key[2]][key[3]]['integral'])
+                integral_stdev_bools = pd.notnull(self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'])
+                integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][integral_value_bools][0]
+                integral_stdev = self.df[key[0]][key[1]][key[2]][key[3]]['integral std dev'][integral_stdev_bools][0]
                 legend_title += '\nIntegral Value = {} +/- {}'.format(integral_value, integral_stdev)
             except:
                 # Type A gives no integral stdev
-                integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][0]
+                integral_value_bools = pd.notnull(self.df[key[0]][key[1]][key[2]][key[3]]['integral'])
+                integral_value = self.df[key[0]][key[1]][key[2]][key[3]]['integral'][integral_value_bools][0]
                 legend_title += '\nIntegral Value = {}'.format(integral_value)
 
             legends.append(legend_title)

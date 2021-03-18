@@ -13,14 +13,18 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
         # Grab the plots object
         self.plots = scale_plots.Plots()
+        self.filename_widgets = []
         self.filenames = []
         self.cwd = os.getcwd()
 
+        self.file_grid_widget = PyQt5.QtWidgets.QWidget()
         self.data_grid_widget = PyQt5.QtWidgets.QWidget()
         self.extra_options_widget = PyQt5.QtWidgets.QWidget()
         self.widget = PyQt5.QtWidgets.QWidget()
 
         # Create grid layouts
+        self.file_grid_layout = PyQt5.QtWidgets.QGridLayout()
+        self.file_grid_widget.setLayout(self.file_grid_layout)
         self.data_add_layout = PyQt5.QtWidgets.QGridLayout()
         self.data_grid_widget.setLayout(self.data_add_layout)
         self.extra_options_layout = PyQt5.QtWidgets.QGridLayout()
@@ -31,42 +35,59 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # Create the file select button
         self.file_select_btn = PyQt5.QtWidgets.QPushButton('Select New File')
         self.file_select_btn.clicked.connect(self.parse_file)
-        self.layout.addWidget(self.file_select_btn, 0, 0)
-
-        # Create the button to select data for plotting
-        self.select_data_btn = PyQt5.QtWidgets.QPushButton('Pick Data to Plot')
-        self.select_data_btn.clicked.connect(self.setup_plot_data)
+        self.file_grid_layout.addWidget(self.file_select_btn, 0, 0)
 
         # Setup the file selet menu
-        self.setCentralWidget(self.widget)        
+        self.setCentralWidget(self.widget)  
+        self.layout.addWidget(self.file_grid_widget)
 
     def parse_file(self):
         # Let the user pick the sdf file to read in
         filename = PyQt5.QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', self.cwd)[0]
         # Parse the selected sdf file into a DataFrame
-        if filename != '':
+        if filename != '' and filename not in self.filenames:
             self.plots.sdf_to_df(filename)
+            row = len(self.filenames)
 
             # Update the widget to show the filename
-            row = len(self.filenames)
-            self.data_add_layout.removeWidget(self.file_select_btn)
-            file_name = PyQt5.QtWidgets.QLabel(filename)
-            self.layout.addWidget(file_name, row, 0)
-            self.filenames.append(file_name)
-            self.layout.addWidget(self.file_select_btn, row+1, 0)
-            self.layout.addWidget(self.select_data_btn, row+2, 0)
+            if self.filenames:
+                self.file_grid_layout.removeWidget(self.reset_files_btn)
+            self.file_grid_layout.removeWidget(self.file_select_btn)
+            file_name_widget = PyQt5.QtWidgets.QLabel(filename)
+            self.file_grid_layout.addWidget(file_name_widget, row, 0)
+            self.file_grid_layout.addWidget(self.file_select_btn, row+1, 0)
+            self.filename_widgets.append(file_name_widget)
+            self.filenames.append(filename)
+
+            # If first time reading file create rest of the gui
+            if len(self.filenames) == 1:
+                self.reset_files_btn = PyQt5.QtWidgets.QPushButton('Reset Files')
+                self.reset_files_btn.clicked.connect(self.reset_files)
+                self.file_grid_layout.addWidget(self.reset_files_btn, row+2, 0)
+                self.setup_plot_data()
+            else:
+                self.file_grid_layout.addWidget(self.reset_files_btn, row+2, 0)
+                #self.clear_plot_data()
+                # Update combo boxes
+                self.update_exp_box()
+
+    def reset_files(self):
+        # Clear all widgets but file select button
+        for filename_widget in self.filename_widgets:
+            self.file_grid_delete(filename_widget)
+        self.filename_widgets = []
+        self.filenames = []
+        self.plots.df = None
+        self.file_grid_delete(self.reset_files_btn)
+        self.clear_plot_data()
+        if not self.filenames and self.keys:
+            self.layout_delete(self.plot_data_reset_btn)
+            self.layout_delete(self.plot_sens_btn)
+            self.layout_delete(self.plot_per_lethargy_btn)
 
     def setup_plot_data(self):
-        # Remove the widgets from the file selection part of the gui
-        if self.filenames != []:
-            for filename in self.filenames:
-                self.layout_delete(filename)
-            self.layout_delete(self.file_select_btn)
-            self.layout_delete(self.select_data_btn)
-            self.filenames = []
-
-        self.layout.addWidget(self.data_grid_widget, 0, 0)
-        self.layout.addWidget(self.extra_options_widget, 1, 0)
+        self.layout.addWidget(self.data_grid_widget, 2, 0)
+        self.layout.addWidget(self.extra_options_widget, 3, 0)
 
         # Create labels for drop down menus
         exp_label = PyQt5.QtWidgets.QLabel('Experiment')
@@ -90,43 +111,21 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
     def make_boxes(self):
         # Create the drop down menus for the experiments
         self.exp_box = PyQt5.QtWidgets.QComboBox()
-        exps = []
-        for column in self.plots.df.columns:
-            exps.append(column[0])
-        self.exp_box.addItems(sorted(set(exps)))
         self.exp_box.activated.connect(self.update_iso_box)
         self.data_add_layout.addWidget(self.exp_box, 1, 0)
 
         # Create the drop down menu for the isotopes
         self.iso_box = PyQt5.QtWidgets.QComboBox()
-        isos = []
-        for column in self.plots.df.columns:
-            if self.exp_box.currentText() == column[0]:
-                isos.append(column[1])
-        self.iso_box.addItems(sorted(set(isos)))
         self.iso_box.activated.connect(self.update_inter_box)
         self.data_add_layout.addWidget(self.iso_box, 1, 1)
 
         # Create the drop down menu for the interactions
         self.inter_box = PyQt5.QtWidgets.QComboBox()
-        inters = []
-        for column in self.plots.df.columns:
-            if self.exp_box.currentText() == column[0]:
-                if self.iso_box.currentText() == column[1]:
-                    inters.append(column[2])
-        self.inter_box.addItems(sorted(set(inters)))
         self.inter_box.activated.connect(self.update_unit_reg_box)
         self.data_add_layout.addWidget(self.inter_box, 1, 2)
 
         # Create the drop down menu for the unit region numbers
         self.unit_reg_box = PyQt5.QtWidgets.QComboBox()
-        unit_regs = []
-        for column in self.plots.df.columns:
-            if self.exp_box.currentText() == column[0]:
-                if self.iso_box.currentText() == column[1]:
-                    if self.inter_box.currentText() == column[2]:
-                        unit_regs.append(column[3])
-        self.unit_reg_box.addItems(sorted(set(unit_regs), reverse=True))
         self.data_add_layout.addWidget(self.unit_reg_box, 1, 3)
 
         # Create the add button to enter the key
@@ -134,8 +133,21 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.add_button.clicked.connect(self.add_clicked)
         self.data_add_layout.addWidget(self.add_button, 1, 4)
 
+        # Put the options into the combo boxes
+        self.update_exp_box()
+
+    def update_exp_box(self):
+        # Update the available options in the experiment drop down
+        self.exp_box.clear()
+        exps = []
+        for column in self.plots.df.columns:
+            exps.append(column[0])
+        self.exp_box.addItems(sorted(set(exps)))
+        # Update the interactions drop down
+        self.update_iso_box()
+
     def update_iso_box(self):
-        # Update the available options in the isotope drop down   
+        # Update the available options in the isotope drop down
         self.iso_box.clear()
         isos = []
         for column in self.plots.df.columns:
@@ -224,17 +236,17 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             # Create the sensitivities plot button
             self.plot_sens_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities')
             self.plot_sens_btn.clicked.connect(self.plot_sens)
-            self.layout.addWidget(self.plot_sens_btn, 2, 0)
+            self.layout.addWidget(self.plot_sens_btn, 4, 0)
 
             # Create the sensitivities per lethargy button
             self.plot_per_lethargy_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities per Unit Lethargy')
             self.plot_per_lethargy_btn.clicked.connect(self.plot_sens_per_lethargy)
-            self.layout.addWidget(self.plot_per_lethargy_btn, 3, 0)
+            self.layout.addWidget(self.plot_per_lethargy_btn, 5, 0)
 
             # Create the reset button
-            self.plot_data_reset_btn = PyQt5.QtWidgets.QPushButton('Reset All')
+            self.plot_data_reset_btn = PyQt5.QtWidgets.QPushButton('Reset Reactions')
             self.plot_data_reset_btn.clicked.connect(self.plot_data_reset_clicked)
-            self.layout.addWidget(self.plot_data_reset_btn, 4, 0)
+            self.layout.addWidget(self.plot_data_reset_btn, len(self.filenames)+6, 0)
 
             self.create_btns = False
         # If 2 keys then make correlation checking an option
@@ -300,18 +312,26 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         for edit in self.legend_entry_edits.values():
             self.data_add_grid_delete(edit)
         self.data_add_grid_delete(self.add_button)
-        self.extra_options_grid_delete(self.error_bar_check)
-        self.extra_options_grid_delete(self.elow_box)
-        self.extra_options_grid_delete(self.ehigh_box)
-        self.extra_options_grid_delete(self.elow_label)
-        self.extra_options_grid_delete(self.ehigh_label)
+        if len(self.keys) > 0:
+            self.extra_options_grid_delete(self.error_bar_check)
+            self.extra_options_grid_delete(self.elow_box)
+            self.extra_options_grid_delete(self.ehigh_box)
+            self.extra_options_grid_delete(self.elow_label)
+            self.extra_options_grid_delete(self.ehigh_label)
         if len(self.keys) > 1:
             self.extra_options_grid_delete(self.corr_check)
             self.extra_options_grid_delete(self.corr_text_pos_label)
             self.extra_options_grid_delete(self.corr_text_pos_box)
-        self.layout_delete(self.plot_data_reset_btn)
-        self.layout_delete(self.plot_sens_btn)
-        self.layout_delete(self.plot_per_lethargy_btn)
+        if self.filenames and self.keys:
+            self.layout_delete(self.plot_data_reset_btn)
+            self.layout_delete(self.plot_sens_btn)
+            self.layout_delete(self.plot_per_lethargy_btn)
+
+    def file_grid_delete(self, widget):
+        # Deletes a widget from the data add object
+        self.file_grid_layout.removeWidget(widget)
+        widget.deleteLater()
+        widget = None
 
     def data_add_grid_delete(self, widget):
         # Deletes a widget from the data add object
