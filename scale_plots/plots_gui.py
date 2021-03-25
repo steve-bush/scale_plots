@@ -1,5 +1,6 @@
 import PyQt5
 import PyQt5.QtWidgets
+import PyQt5.QtCore
 import matplotlib.pyplot as plt
 import sys
 import os
@@ -105,7 +106,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # Create the experiment drop down menus
         self.keys = []
         self.legend_entry_edits = {}
-        self.create_btns = True
         self.make_boxes()
     
     def make_boxes(self):
@@ -206,11 +206,16 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.keys.append(key)
 
         # If the add button is clicked for the first time
-        if self.create_btns:
+        if len(self.keys) == 1:
             # Create the check box for plotting error bars
             self.error_bar_check = PyQt5.QtWidgets.QCheckBox('Plot Errorbars')
-            self.error_bar_check.toggle()
+            self.error_bar_check.stateChanged.connect(self.single_check)
             self.extra_options_layout.addWidget(self.error_bar_check, 0, 0)
+
+            # Create the check boc for plotting fill between error bars
+            self.fill_bet_check = PyQt5.QtWidgets.QCheckBox('Plot Fill Between')
+            self.fill_bet_check.stateChanged.connect(self.single_check)
+            self.extra_options_layout.addWidget(self.fill_bet_check, 1, 0)
 
             # Create the energy bounds boxes and label
             self.elow_box = PyQt5.QtWidgets.QComboBox()
@@ -248,20 +253,30 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.plot_data_reset_btn.clicked.connect(self.plot_data_reset_clicked)
             self.layout.addWidget(self.plot_data_reset_btn, len(self.filenames)+6, 0)
 
-            self.create_btns = False
         # If 2 keys then make correlation checking an option
         elif len(self.keys) == 2:
             # Create the check box for showing the correlation
             self.corr_check = PyQt5.QtWidgets.QCheckBox('Show Correlation')
-            self.extra_options_layout.addWidget(self.corr_check, 1, 0)
+            self.extra_options_layout.addWidget(self.corr_check, 2, 0)
 
             # Create the label and combo box for correlation text position
             self.corr_text_pos_label = PyQt5.QtWidgets.QLabel('Correlation Text Position:')
             self.corr_text_pos_box = PyQt5.QtWidgets.QComboBox()
             positions = ['Bottom Right', 'Bottom Left', 'Top Right', 'Top Left']
             self.corr_text_pos_box.addItems(positions)
-            self.extra_options_layout.addWidget(self.corr_text_pos_label, 2, 0)
-            self.extra_options_layout.addWidget(self.corr_text_pos_box, 2, 1)
+            self.extra_options_layout.addWidget(self.corr_text_pos_label, 2, 1)
+            self.extra_options_layout.addWidget(self.corr_text_pos_box, 2, 2)
+
+    def single_check(self, state):
+        # Ensure that only one error checkbox is marked
+        if state == PyQt5.QtCore.Qt.Checked:
+            # If the error bar is checked
+            if self.sender() == self.error_bar_check:
+                # Uncheck the fill between checkbox
+                self.fill_bet_check.setChecked(False)
+            elif self.sender() == self.fill_bet_check:
+                # Uncheck the error bar checkbox
+                self.error_bar_check.setChecked(False)
 
     def plot_data_reset_clicked(self):
         # Setup GUI to select new data
@@ -270,17 +285,19 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
     def plot_sens(self):
         # Get plotting data
-        elow, ehigh, error_flag, corr_flag, legend_entries, r_pos = self.preplot()
+        elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos = self.preplot()
         # Make new window of the sensitivity plot
-        self.plots.sensitivity_plot(self.keys, elow=elow, ehigh=ehigh, plot_std_dev=error_flag,
-                                    plot_corr=corr_flag, legend_dict=legend_entries, r_pos=r_pos)
+        self.plots.sensitivity_plot(self.keys, elow=elow, ehigh=ehigh, plot_err_bar=error_bar_flag,
+                                    plot_fill_bet=fill_bet_flag, plot_corr=corr_flag,
+                                    legend_dict=legend_entries, r_pos=r_pos)
 
     def plot_sens_per_lethargy(self):
         # Get plotting data
-        elow, ehigh, error_flag, corr_flag, legend_entries, r_pos = self.preplot()
+        elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos = self.preplot()
         # Make new window of the sensitivity plot
-        self.plots.sensitivity_lethargy_plot(self.keys, elow=elow, ehigh=ehigh, plot_std_dev=error_flag,
-                                             plot_corr=corr_flag, legend_dict=legend_entries, r_pos=r_pos)
+        self.plots.sensitivity_lethargy_plot(self.keys, elow=elow, ehigh=ehigh, plot_err_bar=error_bar_flag,
+                                             plot_fill_bet=fill_bet_flag, plot_corr=corr_flag,
+                                             legend_dict=legend_entries, r_pos=r_pos)
 
     def preplot(self):
         # Get the high and low bounds
@@ -291,7 +308,8 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         for key, legend_edit in self.legend_entry_edits.items():
             legend_entries[key] = legend_edit.text()
         # Check whether the error and correlation should be plotted
-        error_flag = self.error_bar_check.isChecked()
+        error_bar_flag = self.error_bar_check.isChecked()
+        fill_bet_flag = self.fill_bet_check.isChecked()
         if len(self.keys) > 1:
             corr_flag = self.corr_check.isChecked()
             r_pos = self.corr_text_pos_box.currentText()
@@ -301,7 +319,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # Stops 'QCoreApplication::exec: The event loop is already running' warning
         plt.ion()
         plt.clf()
-        return elow, ehigh, error_flag, corr_flag, legend_entries, r_pos
+        return elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos
 
     def clear_plot_data(self):
         # Remove all uneeded widgets
@@ -314,6 +332,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.data_add_grid_delete(self.add_button)
         if len(self.keys) > 0:
             self.extra_options_grid_delete(self.error_bar_check)
+            self.extra_options_grid_delete(self.fill_bet_check)
             self.extra_options_grid_delete(self.elow_box)
             self.extra_options_grid_delete(self.ehigh_box)
             self.extra_options_grid_delete(self.elow_label)
