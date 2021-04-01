@@ -318,7 +318,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             r_pos = 'bottom right'
         # Stops 'QCoreApplication::exec: The event loop is already running' warning
         plt.ion()
-        plt.clf()
         return elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos
 
     def clear_plot_data(self):

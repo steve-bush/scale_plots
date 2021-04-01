@@ -11,7 +11,8 @@ class Plots():
 
     def __init__(self):
         self.df = None
-        self.sig_figs = 4
+        self.en_bound_dict = {}
+
 
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
@@ -51,7 +52,7 @@ class Plots():
             for i in range(num_neutron_groups):
                 bound = '{}:{}'.format(bounds[i],bounds[i+1])
                 energy_bounds.append(bound)
-
+            self.en_bound_dict[experiment] = energy_bounds
             # Number of lines each profile has of sensitivity values
             lines_values = ceil(num_neutron_groups/5)
             # Number of lines each sensitivity profile takes
@@ -76,7 +77,6 @@ class Plots():
 
                     # Setup the sensitivity data
                     sens_start = key_start+2
-                    stdevs = np.nan
                 elif type_b:
                     # Type B
                     unit_num = lines[key_start+1].split()[0]
@@ -86,10 +86,10 @@ class Plots():
                     # Type A has no stdev so grab it here
                     sens_start = key_start+4
                     stdevs = ''.join(lines[sens_start+lines_values : key_start+lines_profile]).split()
+                    data[(experiment, nuclide, interaction, unit_region, 'std dev')] = np.array(stdevs, dtype=float)
                 # Place the sensitivities into the dictionary
                 sens = ''.join(lines[sens_start : sens_start+lines_values]).split()
                 data[(experiment, nuclide, interaction, unit_region, 'sensitivity')] = np.array(sens, dtype=float)
-                data[(experiment, nuclide, interaction, unit_region, 'std dev')] = np.array(stdevs, dtype=float)
 
         # Create or append the dataframe indexed by energy groups
         if self.df is None:
@@ -124,12 +124,16 @@ class Plots():
             Uncertainty of the integral value.
         '''
         # Collect the sensitivites and uncertainties
-        sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'], dtype=float)
-        stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'], dtype=float)
+        key_df = self.df[key[0]][key[1]][key[2]][key[3]].dropna()
+        sens = np.array(key_df['sensitivity'], dtype=float)
         # Calculate the integral
         int_value = np.sum(sens)
-        # Calculate the uncertainty (root sum square)
-        int_unc = np.sqrt(np.sum(np.square(stdevs)))
+        if len(key_df.columns) == 2:
+            stdevs = np.array(key_df['std dev'], dtype=float)
+            # Calculate the uncertainty (root sum square)
+            int_unc = np.sqrt(np.sum(np.square(stdevs)))
+        else:
+            int_unc = np.nan
 
         return int_value, int_unc
 
@@ -166,8 +170,8 @@ class Plots():
         for i in range(len(keys)-1):
             for j in range(i+1, len(keys)):
                 # Compare each data set
-                sens_x = np.array(self.df[keys[i][0]][keys[i][1]][keys[i][2]][keys[i][3]]['sensitivity'].loc[indices], dtype=float)
-                sens_y = np.array(self.df[keys[j][0]][keys[j][1]][keys[j][2]][keys[j][3]]['sensitivity'].loc[indices], dtype=float)
+                sens_x = np.array(self.df[keys[i][0]][keys[i][1]][keys[i][2]][keys[i][3]]['sensitivity'].loc[indices].dropna(), dtype=float)
+                sens_y = np.array(self.df[keys[j][0]][keys[j][1]][keys[j][2]][keys[j][3]]['sensitivity'].loc[indices].dropna(), dtype=float)
                 if lethargy is False:
                     sens_x = sens_x/lethargies
                     sens_y = sens_y/lethargies
@@ -265,10 +269,35 @@ class Plots():
             keys = [keys]
         # Assert maximum number of keys to plot
         assert len(keys) < 24, 'Maximum number of keys to plot is 24'
+        # Create the title
+        exp_list = []
+        for exp, _, _, _ in keys:
+            exp_list.append(exp)
+        exp_set = set(exp_list)
+        title = '-'.join(exp_set)
         # Create the text for the correlation
         r_text = ''
         # The energy bounds information
-        indices, energy_vals, lethargies = self.__get_energy_bounds(elow, ehigh)
+        indices_dict = {}
+        energy_vals_dict = {}
+        lethargies_dict = {}
+        for exp in exp_set:
+            indices_list = []
+            energy_vals_array = np.array([], dtype=float)
+            lethargies_array = np.array([], dtype=float)
+            for bound in self.df[exp].dropna().index:
+                # Add the high and low bounds to energy bounds
+                e_upper = float(bound.split(':')[0])
+                e_lower = float(bound.split(':')[1])
+                # Only add in energy values within given elow and ehigh
+                if e_upper <= ehigh and e_lower >= elow:
+                    indices_list.append(bound)
+                    energy_vals_array = np.append(energy_vals_array, [e_upper, e_lower])
+                    # Calculate the lethargies for each energy grouping
+                    lethargies_array = np.append(lethargies_array, log(e_upper/e_lower))
+            indices_dict[exp] = indices_list
+            energy_vals_dict[exp] = energy_vals_array
+            lethargies_dict[exp] = lethargies_array
         if plot_corr:
             r_text += 'Correlations:'
             # Get the correlation coefficients
@@ -290,7 +319,12 @@ class Plots():
         colors = ['g', 'r', 'c', 'm', 'k', 'y']
         ls = ['-', '--', '.-', '.']
         legends = []
+        plt.figure()
         for key in keys:
+            # Get the keys energy bound info
+            indices = indices_dict[key[0]]
+            energy_vals = energy_vals_dict[key[0]]
+            lethargies = lethargies_dict[key[0]]
             # Create the legend title
             if legend_dict is None:
                 # If no legend was passed in create one
@@ -302,21 +336,28 @@ class Plots():
             # Raise an error if passed in keys are not 4
             assert len(key) == 4, 'Must pass 4 identifiers in each key'
 
-            # Collect the sensitvities and standard deviations
-            sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'].loc[indices], dtype=float)
-            stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'].loc[indices], dtype=float)
+            # Collect the the data for the key in given energy bounds and remove NaN
+            key_df = self.df[key[0]][key[1]][key[2]][key[3]].loc[indices].dropna()
+            sens = np.array(key_df['sensitivity'], dtype=float)
+            # Flag for stdev values existing
+            typeB = False
+            if len(key_df.columns) == 2:
+                stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'].loc[indices].dropna(), dtype=float)
+                typeB = True
 
             # Calculate the sensitivities per lethargy if passed in
             if plot_lethargy:
                 sens = sens/lethargies
-                stdevs = stdevs/lethargies
+                if typeB:
+                    stdevs = stdevs/lethargies
 
             # Make each sensitivity std dev appear twice for step feature
             sens_step = np.array([], dtype=float)
             stdev_step = np.array([], dtype=float)
             for j in range(len(sens)):
                 sens_step = np.append(sens_step, [sens[j], sens[j]])
-                stdev_step = np.append(stdev_step, [stdevs[j], stdevs[j]])
+                if typeB:
+                    stdev_step = np.append(stdev_step, [stdevs[j], stdevs[j]])
 
             # Plot the sensitivity
             if not plot_fill_bet:
@@ -325,7 +366,7 @@ class Plots():
                 plt.plot(energy_vals, sens_step, ls=ls[i//6], color=colors[i%6], linewidth=1, alpha=0.2)
 
             # If standard deviations exist
-            if not np.isnan(stdevs).all():
+            if typeB:
                 if plot_err_bar:
                     assert plot_fill_bet is False, 'plot_err_bar and plot_fill_bet cannot both be True' 
                     # Plot the error bars
@@ -338,7 +379,7 @@ class Plots():
 
             # Add the integral value information
             int_value, int_unc = self.get_integral(key)
-            if np.isnan(stdevs).all():
+            if not typeB:
                 # If there is no integral std dev
                 legend_title += '\nIntegral Value = {:.4}'.format(int_value)
             else:
@@ -368,7 +409,7 @@ class Plots():
         plt.xscale('log')
         plt.xlabel('Energy (eV)')
         plt.ylabel(ylabel)
-        plt.title('title')
+        plt.title(title)
         plt.grid(b=True)
         plt.show()
 
