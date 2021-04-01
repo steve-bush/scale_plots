@@ -168,53 +168,11 @@ class Plots():
                 # Compare each data set
                 sens_x = np.array(self.df[keys[i][0]][keys[i][1]][keys[i][2]][keys[i][3]]['sensitivity'].loc[indices], dtype=float)
                 sens_y = np.array(self.df[keys[j][0]][keys[j][1]][keys[j][2]][keys[j][3]]['sensitivity'].loc[indices], dtype=float)
-                if lethargy is False:
-                    sens_x = sens_x/lethargies
-                    sens_y = sens_y/lethargies
+                sens_x = sens_x/lethargies
+                sens_y = sens_y/lethargies
                 
                 r[(tuple(keys[i]),tuple(keys[j]))] = pearsonr(sens_x, sens_y)[0]
         return r
-
-    def sensitivity_plot(self, keys, elow=float('-inf'), ehigh=float('inf'), plot_err_bar=True,
-                         plot_fill_bet=False, plot_corr=False, legend_dict=None, r_pos='bottom right'):
-        '''Plot the sensitivites for the given isotopes, reactions,
-        unit numbers, and region numbers. Creates a matplotlib.pyplot
-        step plot for the energy bounds from the DataFrame.
-
-        Parameters
-        ----------
-        keys : list of lists
-            Indices in the pandas DataFrame where the desired
-            sensitivities are stored.
-        elow : float, optional
-            The low bound for energies to plot.
-            Defaults to -inf.
-        ehigh : float, optional
-            The high bound for energies to plot.
-            Defaults to inf.
-        plot_err_bar : bool, optional
-            Whether the user wants the error bars to be included
-            in the generated plot. Defaults to True.
-        plot_fill_bet : bool, optional
-            Whether the user wants the error to be plotted as a
-            fill between. Defaults to False.
-        plot_corr : bool, optional
-            Whether the user wants the correlation coefficient to
-            be given in the plot. Defaults to False.
-        legend_dict : dictionary, optional
-            keys : key in the keys list of the selected isotope
-            value : string to replace the automatically generated legend
-        r_pos : str, optional
-            Where the correlation coefficient should go on the plot.
-            Defaults to 'bottom right'. Can also be 'top right',
-            'bottom left', and 'top left'.
-
-        '''
-        ylabel = 'Sensitivity'
-        plot_lethargy = False
-
-        # Send the data to the plot making function
-        self.__make_plot(keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr, plot_lethargy, legend_dict, r_pos, ylabel)
 
     def sensitivity_lethargy_plot(self, keys, elow=float('-inf'), ehigh=float('inf'), plot_err_bar=True,
                                   plot_fill_bet=False, plot_corr=False, legend_dict=None, r_pos='bottom right'):
@@ -252,14 +210,7 @@ class Plots():
 
         '''
         ylabel = 'Sensitivity per unit lethargy'
-        plot_lethargy = True
 
-        # Send the data to the plot making function
-        self.__make_plot(keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr, plot_lethargy, legend_dict, r_pos, ylabel)
-
-    def __make_plot(self, keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr,
-                    plot_lethargy, legend_dict, r_pos, ylabel):
-        '''The parts of making a plot that are repeated.'''
         # Make sure keys is a list of lists
         if type(keys[0]) is not list:
             keys = [keys]
@@ -272,7 +223,7 @@ class Plots():
         if plot_corr:
             r_text += 'Correlations:'
             # Get the correlation coefficients
-            r_dict = self.get_corr(keys, elow=elow, ehigh=ehigh, lethargy=plot_lethargy)
+            r_dict = self.get_corr(keys, elow=elow, ehigh=ehigh)
             # Put the correlation coefficients into a string
             for i in range(len(keys)-1):
                 for j in range(i+1, len(keys)):
@@ -306,10 +257,9 @@ class Plots():
             sens = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['sensitivity'].loc[indices], dtype=float)
             stdevs = np.array(self.df[key[0]][key[1]][key[2]][key[3]]['std dev'].loc[indices], dtype=float)
 
-            # Calculate the sensitivities per lethargy if passed in
-            if plot_lethargy:
-                sens = sens/lethargies
-                stdevs = stdevs/lethargies
+            # Calculate the sensitivities per lethargy
+            sens = sens/lethargies
+            stdevs = stdevs/lethargies
 
             # Make each sensitivity std dev appear twice for step feature
             sens_step = np.array([], dtype=float)
@@ -388,4 +338,3 @@ class Plots():
                 # Calculate the lethargies for each energy grouping
                 lethargies = np.append(lethargies, log(e_upper/e_lower))
         return indices, energy_vals, lethargies
-

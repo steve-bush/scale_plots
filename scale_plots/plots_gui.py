@@ -83,7 +83,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.clear_plot_data()
         if not self.filenames and self.keys:
             self.layout_delete(self.plot_data_reset_btn)
-            self.layout_delete(self.plot_sens_btn)
             self.layout_delete(self.plot_per_lethargy_btn)
 
     def setup_plot_data(self):
@@ -238,20 +237,15 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.extra_options_layout.addWidget(self.elow_box, 0, 2)
             self.extra_options_layout.addWidget(self.ehigh_box, 1, 2)
 
-            # Create the sensitivities plot button
-            self.plot_sens_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities')
-            self.plot_sens_btn.clicked.connect(self.plot_sens)
-            self.layout.addWidget(self.plot_sens_btn, 4, 0)
-
             # Create the sensitivities per lethargy button
             self.plot_per_lethargy_btn = PyQt5.QtWidgets.QPushButton('Plot Sensitivities per Unit Lethargy')
             self.plot_per_lethargy_btn.clicked.connect(self.plot_sens_per_lethargy)
-            self.layout.addWidget(self.plot_per_lethargy_btn, 5, 0)
+            self.layout.addWidget(self.plot_per_lethargy_btn, 4, 0)
 
             # Create the reset button
             self.plot_data_reset_btn = PyQt5.QtWidgets.QPushButton('Reset Reactions')
             self.plot_data_reset_btn.clicked.connect(self.plot_data_reset_clicked)
-            self.layout.addWidget(self.plot_data_reset_btn, len(self.filenames)+6, 0)
+            self.layout.addWidget(self.plot_data_reset_btn, 5, 0)
 
         # If 2 keys then make correlation checking an option
         elif len(self.keys) == 2:
@@ -283,23 +277,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.clear_plot_data()
         self.setup_plot_data()
 
-    def plot_sens(self):
-        # Get plotting data
-        elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos = self.preplot()
-        # Make new window of the sensitivity plot
-        self.plots.sensitivity_plot(self.keys, elow=elow, ehigh=ehigh, plot_err_bar=error_bar_flag,
-                                    plot_fill_bet=fill_bet_flag, plot_corr=corr_flag,
-                                    legend_dict=legend_entries, r_pos=r_pos)
-
     def plot_sens_per_lethargy(self):
-        # Get plotting data
-        elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos = self.preplot()
-        # Make new window of the sensitivity plot
-        self.plots.sensitivity_lethargy_plot(self.keys, elow=elow, ehigh=ehigh, plot_err_bar=error_bar_flag,
-                                             plot_fill_bet=fill_bet_flag, plot_corr=corr_flag,
-                                             legend_dict=legend_entries, r_pos=r_pos)
-
-    def preplot(self):
         # Get the high and low bounds
         elow = float(self.elow_box.currentText())
         ehigh = float(self.ehigh_box.currentText())
@@ -319,7 +297,10 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # Stops 'QCoreApplication::exec: The event loop is already running' warning
         plt.ion()
         plt.clf()
-        return elow, ehigh, error_bar_flag, fill_bet_flag, corr_flag, legend_entries, r_pos
+        # Make new window of the sensitivity plot
+        self.plots.sensitivity_lethargy_plot(self.keys, elow=elow, ehigh=ehigh, plot_err_bar=error_bar_flag,
+                                             plot_fill_bet=fill_bet_flag, plot_corr=corr_flag,
+                                             legend_dict=legend_entries, r_pos=r_pos)
 
     def clear_plot_data(self):
         # Remove all uneeded widgets
@@ -343,7 +324,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.extra_options_grid_delete(self.corr_text_pos_box)
         if self.filenames and self.keys:
             self.layout_delete(self.plot_data_reset_btn)
-            self.layout_delete(self.plot_sens_btn)
             self.layout_delete(self.plot_per_lethargy_btn)
 
     def file_grid_delete(self, widget):
