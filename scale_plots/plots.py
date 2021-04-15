@@ -12,7 +12,6 @@ class Plots():
     def __init__(self):
         self.df = None
 
-
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
         a pandas DataFrame.
@@ -173,7 +172,7 @@ class Plots():
                 if lethargy is False:
                     sens_x = sens_x/lethargies
                     sens_y = sens_y/lethargies
-                
+
                 r[(tuple(keys[i]),tuple(keys[j]))] = pearsonr(sens_x, sens_y)[0]
         return r
 
@@ -373,7 +372,7 @@ class Plots():
                     eb[0].set_linestyle(':')
                 elif plot_fill_bet:
                     # Plot the std dev as a fill between
-                    plt.fill_between(energy_vals, sens_step-stdev_step, sens_step+stdev_step, ls=ls[i//6], color=colors[i%6], alpha=0.3)              
+                    plt.fill_between(energy_vals, sens_step-stdev_step, sens_step+stdev_step, ls=ls[i//6], color=colors[i%6], alpha=0.3)
 
             # Add the integral value information
             int_value, int_unc = self.get_integral(key)
@@ -427,4 +426,3 @@ class Plots():
                 # Calculate the lethargies for each energy grouping
                 lethargies = np.append(lethargies, log(e_upper/e_lower))
         return indices, energy_vals, lethargies
-
