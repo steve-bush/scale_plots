@@ -14,76 +14,46 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.plots = scale_plots.Plots()
         self.filename_widgets = []
         self.filenames = []
+
         # Current directory for file selection
         self.cwd = os.getcwd()
+
         # Main widget
         self.widget = PyQt5.QtWidgets.QWidget()
         self.layout = PyQt5.QtWidgets.QGridLayout()
         self.widget.setLayout(self.layout)
+        self.setCentralWidget(self.widget)
+
         # Create grid widget and layout for file selection
         self.file_grid_widget = PyQt5.QtWidgets.QWidget()
         self.file_grid_layout = PyQt5.QtWidgets.QGridLayout()
         self.file_grid_widget.setLayout(self.file_grid_layout)
+
+        # Setup the file selet menu
+        self.layout.addWidget(self.file_grid_widget, 0, 0)
+
         # Create the file select button
         self.file_select_btn = PyQt5.QtWidgets.QPushButton('Select New File')
         self.file_select_btn.clicked.connect(self.parse_file)
-        self.file_grid_layout.addWidget(self.file_select_btn, 0, 0)
-        # Setup the file selet menu
-        self.setCentralWidget(self.widget)
-        self.layout.addWidget(self.file_grid_widget, 0, 0)
+        self.layout.addWidget(self.file_select_btn, 1, 0)
 
-    def parse_file(self):
-        # Let the user pick the sdf file to read in
-        filename = PyQt5.QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', self.cwd)[0]
-        # Parse the selected sdf file into a DataFrame
-        if filename != '' and filename not in self.filenames:
-            self.plots.sdf_to_df(filename)
-            row = len(self.filenames)
-
-            # Update the widget to show the filename
-            if self.filenames:
-                self.file_grid_layout.removeWidget(self.reset_files_btn)
-            self.file_grid_layout.removeWidget(self.file_select_btn)
-            file_name_widget = PyQt5.QtWidgets.QLabel(filename)
-            self.file_grid_layout.addWidget(file_name_widget, row, 0)
-            self.file_grid_layout.addWidget(self.file_select_btn, row+1, 0)
-            self.filename_widgets.append(file_name_widget)
-            self.filenames.append(filename)
-
-            # If first time reading file create rest of the gui
-            if len(self.filenames) == 1:
-                self.reset_files_btn = PyQt5.QtWidgets.QPushButton('Reset Files')
-                self.reset_files_btn.clicked.connect(self.reset_files)
-                self.file_grid_layout.addWidget(self.reset_files_btn, row+2, 0)
-                self.setup_plot_data()
-            else:
-                self.file_grid_layout.addWidget(self.reset_files_btn, row+2, 0)
-                # Update combo boxes
-                self.update_exp_box()
-
-    def reset_files(self):
-        # Clear all widgets but file select button
-        for filename_widget in self.filename_widgets:
-            self.file_grid_delete(filename_widget)
-        self.filename_widgets = []
-        self.filenames = []
-        self.plots.df = None
-        self.file_grid_delete(self.reset_files_btn)
-        self.layout_delete(self.file_reaction_line)
-        self.clear_plot_data()
-
-    def setup_plot_data(self):
+        # Create the reset files widget
+        row = len(self.filenames)
+        self.reset_files_btn = PyQt5.QtWidgets.QPushButton('Reset Files')
+        self.reset_files_btn.clicked.connect(self.reset_files)
+        self.layout.addWidget(self.reset_files_btn, 2, 0)
+        
         # Insert horizontal line between file and reaction selections
         self.file_reaction_line = PyQt5.QtWidgets.QFrame()
         self.file_reaction_line.setLineWidth(2)
         self.file_reaction_line.setFrameShape(PyQt5.QtWidgets.QFrame.HLine)
-        self.layout.addWidget(self.file_reaction_line, 2, 0)
+        self.layout.addWidget(self.file_reaction_line, 3, 0)
 
         # Create and add the data grid widget for reactions
         self.data_grid_widget = PyQt5.QtWidgets.QWidget()
         self.data_grid_layout = PyQt5.QtWidgets.QGridLayout()
         self.data_grid_widget.setLayout(self.data_grid_layout)
-        self.layout.addWidget(self.data_grid_widget, 3, 0)
+        self.layout.addWidget(self.data_grid_widget, 4, 0)
 
         # Create labels for drop down menus
         exp_label = PyQt5.QtWidgets.QLabel('Experiment')
@@ -98,6 +68,34 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.data_grid_layout.addWidget(legend_entry_label, 0, 4)
         self.labels = [exp_label, iso_label, inter_label, unit_reg_label, legend_entry_label]
 
+        self.setup_plot_data()
+
+    def parse_file(self):
+        # Let the user pick the sdf file to read in
+        filename = PyQt5.QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', self.cwd)[0]
+        # Parse the selected sdf file into a DataFrame
+        if filename != '' and filename not in self.filenames:
+            self.plots.sdf_to_df(filename)
+            row = len(self.filenames)
+
+            # Update the widget to show the filename
+            file_name_widget = PyQt5.QtWidgets.QLabel(filename)
+            self.file_grid_layout.addWidget(file_name_widget, row, 0)
+            self.filename_widgets.append(file_name_widget)
+            self.filenames.append(filename)
+            # Update combo boxes
+            self.update_exp_box()
+
+    def reset_files(self):
+        if len(self.filenames) > 0:
+            # Clear all widgets but file select button
+            for filename_widget in self.filename_widgets:
+                self.file_grid_delete(filename_widget)
+            self.filename_widgets = []
+            self.filenames = []
+            self.plots.df = None
+
+    def setup_plot_data(self):
         # Create the experiment drop down menus
         self.keys = []
         self.legend_entry_edits = {}
