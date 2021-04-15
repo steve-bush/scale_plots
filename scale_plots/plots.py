@@ -11,7 +11,6 @@ class Plots():
 
     def __init__(self):
         self.df = None
-        self.en_bound_dict = {}
 
 
     def sdf_to_df(self, filename):
@@ -52,7 +51,6 @@ class Plots():
             for i in range(num_neutron_groups):
                 bound = '{}:{}'.format(bounds[i],bounds[i+1])
                 energy_bounds.append(bound)
-            self.en_bound_dict[experiment] = energy_bounds
             # Number of lines each profile has of sensitivity values
             lines_values = ceil(num_neutron_groups/5)
             # Number of lines each sensitivity profile takes
@@ -363,7 +361,7 @@ class Plots():
             if not plot_fill_bet:
                 plt.plot(energy_vals, sens_step, ls=ls[i//6], color=colors[i%6], linewidth=1)
             else:
-                plt.plot(energy_vals, sens_step, ls=ls[i//6], color=colors[i%6], linewidth=1, alpha=0.2)
+                plt.plot(energy_vals, sens_step, ls=ls[i//6], color=colors[i%6], linewidth=1, alpha=0)
 
             # If standard deviations exist
             if typeB:
@@ -375,7 +373,7 @@ class Plots():
                     eb[0].set_linestyle(':')
                 elif plot_fill_bet:
                     # Plot the std dev as a fill between
-                    plt.fill_between(energy_vals, sens_step-stdev_step, sens_step+stdev_step, ls=ls[i//6], color=colors[i%6], alpha=0.2)              
+                    plt.fill_between(energy_vals, sens_step-stdev_step, sens_step+stdev_step, ls=ls[i//6], color=colors[i%6], alpha=0.3)              
 
             # Add the integral value information
             int_value, int_unc = self.get_integral(key)
