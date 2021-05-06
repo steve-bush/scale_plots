@@ -165,7 +165,7 @@ class Plots():
             g_groups = list(unpack(g_string, full_file[g_start:g_end]))
             g_end += 4
         
-        # Not sure what happens when both groups are present to make a set of them
+        # Not sure what happens when both groups are present so make a set of them
         for i in range(len(g_groups)):
             n_groups.append(g_groups[i])
         self.cov_groups[filename] = np.array(sorted(set(n_groups), reverse=True))

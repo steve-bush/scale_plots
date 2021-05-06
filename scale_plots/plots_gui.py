@@ -39,8 +39,21 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.sens_widget = PyQt5.QtWidgets.QGroupBox()
         self.sens_layout = PyQt5.QtWidgets.QVBoxLayout()
         self.sens_widget.setLayout(self.sens_layout)
-        self.layout.addWidget(self.sens_widget, 0)
+        self.layout.addWidget(self.sens_widget)
 
+        # Setup the sensitivity widget's widgets
+        self.init_sens()
+
+        # Covariance widget
+        self.cov_widget = PyQt5.QtWidgets.QGroupBox()
+        self.cov_layout = PyQt5.QtWidgets.QVBoxLayout()
+        self.cov_widget.setLayout(self.cov_layout)
+        self.layout.addWidget(self.cov_widget)
+
+        # Setup the covariance widget's widgets
+        self.init_cov()
+
+    def init_sens(self):
         # Create label for sensitivity file selection
         self.sens_files_label = PyQt5.QtWidgets.QLabel('Sensitivity Files')
         self.sens_files_label.setFont(PyQt5.QtGui.QFont('Arial', 14))
@@ -183,15 +196,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.plot_per_lethargy_btn.clicked.connect(self.plot_sens)
         self.sens_layout.addWidget(self.plot_per_lethargy_btn, 12)
 
-
-
-
-        # Covariance widget
-        self.cov_widget = PyQt5.QtWidgets.QGroupBox()
-        self.cov_layout = PyQt5.QtWidgets.QVBoxLayout()
-        self.cov_widget.setLayout(self.cov_layout)
-        self.layout.addWidget(self.cov_widget, 1)
-
+    def init_cov(self):
         # Create label for covariance file selection
         self.cov_files_label = PyQt5.QtWidgets.QLabel('Covariance Files')
         self.cov_files_label.setFont(PyQt5.QtGui.QFont('Arial', 14))
@@ -330,16 +335,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.plot_rel_cov_btn = PyQt5.QtWidgets.QPushButton('Plot Relative Covariance Matrix')
         self.plot_rel_cov_btn.clicked.connect(self.plot_cov)
         self.cov_layout.addWidget(self.plot_rel_cov_btn, 11)
-        
-        # Create the covariance plotting button
-        self.plot_cov_btn = PyQt5.QtWidgets.QPushButton('Plot Covariance Matrix')
-        self.plot_cov_btn.clicked.connect(self.plot_cov)
-        self.cov_layout.addWidget(self.plot_cov_btn, 12)
-
-        # Create the correlation plotting button
-        self.plot_corr_btn = PyQt5.QtWidgets.QPushButton('Plot Correlation Matrix')
-        self.plot_corr_btn.clicked.connect(self.plot_cov)
-        self.cov_layout.addWidget(self.plot_corr_btn, 13)
 
     def parse_sens_file(self):
         # Let the user pick the sdf file to read in
