@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import sys
 import os
 import scale_plots
-from scale_ids import mat_ids, mt_ids
+from scale_ids import mt_ids
 
 
 class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
@@ -246,7 +246,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         cov_interaction_box_label = PyQt5.QtWidgets.QLabel('Interactions')
         self.cov_reaction_layout.addWidget(cov_interaction_box_label, 1, 2)
         cov_label_label = PyQt5.QtWidgets.QLabel('Label')
-        self.cov_reaction_layout.addWidget(legend_entry_label, 1, 3)
+        self.cov_reaction_layout.addWidget(cov_label_label, 1, 3)
         cov_reac1_box_label = PyQt5.QtWidgets.QLabel('Reaction 1:')
         self.cov_reaction_layout.addWidget(cov_reac1_box_label, 2, 0)
         cov_reac2_box_label = PyQt5.QtWidgets.QLabel('Reaction 2:')
@@ -259,6 +259,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
         self.cov_reac1_interaction_box = PyQt5.QtWidgets.QComboBox()
         self.cov_reac1_interaction_box.activated.connect(self.update_nuclide2_box)
+        self.cov_reac1_interaction_box.activated.connect(self.update_reac1_edit)
         self.cov_reaction_layout.addWidget(self.cov_reac1_interaction_box, 2, 2)
 
         self.cov_reac1_label_edit = PyQt5.QtWidgets.QLineEdit()
@@ -269,7 +270,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.cov_reaction_layout.addWidget(self.cov_reac2_nuclide_box, 3, 1)
 
         self.cov_reac2_interaction_box = PyQt5.QtWidgets.QComboBox()
-        self.cov_reac2_interaction_box.activated.connect(self.update_edits)
+        self.cov_reac2_interaction_box.activated.connect(self.update_reac2_edit)
         self.cov_reaction_layout.addWidget(self.cov_reac2_interaction_box, 3, 2)
 
         self.cov_reac2_label_edit = PyQt5.QtWidgets.QLineEdit()
@@ -390,6 +391,13 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.cov_filename_widgets.append(cov_file_name_widget)
             self.cov_filenames.append(cov_filename.split('/')[-1])
 
+            # Create dictionaries for mat IDs
+            self.mat_ids = {}
+            for mat1, _, mat2, _ in self.plots.cov_matrices[cov_filename.split('/')[-1]].keys():
+                # Create a dictionary for names and IDs to sort
+                self.mat_ids[self.plots.get_mat_name(mat1)] = mat1
+                self.mat_ids[self.plots.get_mat_name(mat2)] = mat2
+
             # Update reaction combo boxes
             self.update_filename_box()
 
@@ -420,9 +428,18 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.cov_filename_widgets = []
             self.cov_filenames = []
             self.plots.cov_matrices = {}
+            self.mat_ids = {}
             # Clear the combo boxes
+            self.cov_file_box.clear()
+            self.cov_reac1_nuclide_box.clear()
+            self.cov_reac1_interaction_box.clear()
+            self.cov_reac2_nuclide_box.clear()
+            self.cov_reac2_interaction_box.clear()
             self.cov_ehigh_box.clear()
             self.cov_elow_box.clear()
+            # Clear the label edits
+            self.cov_reac1_label_edit.clear()
+            self.cov_reac2_label_edit.clear()
 
     def update_exp_box(self):
         # Update the available options in the experiment drop down
@@ -480,49 +497,137 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # Update the available options in the filename drop down
         self.cov_file_box.clear()
         self.cov_file_box.addItems(self.cov_filenames)
+        self.update_cov_ebounds()
         self.update_nuclide1_box()
 
     def update_nuclide1_box(self):
         # Update the available options for the first nuclide drop down
         filename = self.cov_file_box.currentText()
         self.cov_reac1_nuclide_box.clear()
+        # Save mat names and dictionary of IDs for sorting
         mats = []
         for mat1, _, mat2, _ in self.plots.cov_matrices[filename].keys():
-            #mats.append(mat_ids[mat1])
-            #mats.append(mat_ids[mat2])
-            if mat1 not in mat_ids.keys():
-                print(mat1)
-            if mat2 not in mat_ids.keys():
-                print(mat2)
-        mats = set(mats)
-        self.cov_reac1_nuclide_box.addItems(mats)
+            # Convert the id to a name
+            name1 = self.plots.get_mat_name(mat1)
+            name2 = self.plots.get_mat_name(mat2)
+            # Add both names to a list
+            mats.append(name1)
+            mats.append(name2)
+        # Add the nuclides sorted by their ID
+        self.cov_reac1_nuclide_box.addItems(sorted(set(mats), key=lambda i: self.mat_ids[i]%1000000))
+        # Update the combo box size for new text
+        self.cov_reac1_nuclide_box.resize(self.cov_reac1_nuclide_box.sizeHint())
+        # Update the reaction 1 interaction combo box
+        self.update_interaction1_box()
     
     def update_interaction1_box(self):
-        pass
+        # Update the available options for the first interaction drop down
+        filename = self.cov_file_box.currentText()
+        self.cov_reac1_interaction_box.clear()
+        # Save mt names
+        mts = []
+        # Get the current nuclide name in reaction 1
+        curr_reac1_nuclide = self.cov_reac1_nuclide_box.currentText()
+        for mat1, mt1, mat2, mt2 in self.plots.cov_matrices[filename].keys():
+            # Names of the nuclides to check with reaction 1
+            mat1name = self.plots.get_mat_name(mat1)
+            mat2name = self.plots.get_mat_name(mat2)
+            # If the first nuclide in the key is in the reaction 1 box
+            if mat1name == curr_reac1_nuclide:
+                mts.append(self.plots.get_mt_name(mt1))
+            # If the second nuclide in the key is in the reaction 2 box
+            if mat2name == curr_reac1_nuclide:
+                mts.append(self.plots.get_mt_name(mt2))
+        # Add the interactions
+        self.cov_reac1_interaction_box.addItems(sorted(set(mts)))
+        # Update the combo box size for new text
+        self.cov_reac1_interaction_box.resize(self.cov_reac1_interaction_box.sizeHint())
+        # Update the reaction 1 label edit
+        self.update_reac1_edit()
+        # Update the reaction 2 nuclide combo box
+        self.update_nuclide2_box()
 
     def update_nuclide2_box(self):
-        pass
+        # Update the available options for the second nuclide drop down
+        filename = self.cov_file_box.currentText()
+        self.cov_reac2_nuclide_box.clear()
+        # Save mat names and dictionary of IDs for sorting
+        mats = []
+        # Get the current reaction 1 information
+        curr_reac1_nuclide = self.cov_reac1_nuclide_box.currentText()
+        curr_reac1_interaction = self.cov_reac1_interaction_box.currentText()
+        for mat1, mt1, mat2, mt2 in self.plots.cov_matrices[filename].keys():
+            # Convert the ids to a name
+            mat1name = self.plots.get_mat_name(mat1)
+            mt1name = self.plots.get_mt_name(mt1)
+            mat2name = self.plots.get_mat_name(mat2)
+            mt2name = self.plots.get_mt_name(mt2)
+            # Check if reaction 1 is the first mat, mt pair
+            if mat1name == curr_reac1_nuclide and mt1name == curr_reac1_interaction:
+                mats.append(mat2name)
+            # Check if reaction 1 is the second mat, mt pair
+            elif mat2name == curr_reac1_nuclide and mt2name == curr_reac1_interaction:
+                mats.append(mat1name)
+        # Add the nuclides sorted by their ID
+        self.cov_reac2_nuclide_box.addItems(sorted(set(mats), key=lambda i: self.mat_ids[i]%1000000))
+        # Update the combo box size for new text
+        self.cov_reac2_nuclide_box.resize(self.cov_reac2_nuclide_box.sizeHint())
+        # Update the reaction 2 interaction combo box
+        self.update_interaction2_box()
 
     def update_interaction2_box(self):
-        pass
+        # Update the available options for the second interaction drop down
+        filename = self.cov_file_box.currentText()
+        self.cov_reac2_interaction_box.clear()
+        # Save mt names
+        mts = []
+        # Get the current combo boxes information
+        curr_reac1_nuclide = self.cov_reac1_nuclide_box.currentText()
+        curr_reac1_interaction = self.cov_reac1_interaction_box.currentText()
+        curr_reac2_nuclide = self.cov_reac2_nuclide_box.currentText()
+        for mat1, mt1, mat2, mt2 in self.plots.cov_matrices[filename].keys():
+            # Names of the nuclides to check with reaction 1 and nuclide 2
+            mat1name = self.plots.get_mat_name(mat1)
+            mt1name = self.plots.get_mt_name(mt1)
+            mat2name = self.plots.get_mat_name(mat2)
+            mt2name = self.plots.get_mt_name(mt2)
+            # Check if reaction 1 is the first mat, mt pair and reaction 2 nuclide is in second
+            if mat1name == curr_reac1_nuclide and mt1name == curr_reac1_interaction and mat2name == curr_reac2_nuclide:
+                mts.append(mt2name)
+            # Check if reaction 1 is the second mat, mt pair and reaction 2 nuclide is in first
+            elif mat2name == curr_reac1_nuclide and mt2name == curr_reac1_interaction and mat1name == curr_reac2_nuclide:
+                mts.append(mt1name)
+        # Add the interactions
+        self.cov_reac2_interaction_box.addItems(sorted(set(mts)))
+        # Update the combo box size for new text
+        self.cov_reac2_interaction_box.resize(self.cov_reac2_interaction_box.sizeHint())
+        # Update the text in the line edit
+        self.update_reac2_edit()
 
-    def update_edits(self):
-        pass
+    def update_reac1_edit(self):
+        # Update the reaction 1 label edit to 'mat1name mt1name'
+        mat1name = self.cov_reac1_nuclide_box.currentText()
+        mt1name = self.cov_reac1_interaction_box.currentText()
+        self.cov_reac1_label_edit.setText('{} {}'.format(mat1name, mt1name))
+    
+    def update_reac2_edit(self):
+        # Update the reaction 1 label edit to 'mat2name mt2name'
+        mat2name = self.cov_reac2_nuclide_box.currentText()
+        mt2name = self.cov_reac2_interaction_box.currentText()
+        self.cov_reac2_label_edit.setText('{} {}'.format(mat2name, mt2name))
     
     def update_cov_ebounds(self):
         # Get the high and low bounds
         filename = self.cov_file_box.currentText()
-        elows = []
-        ehighs = [float(self.plots.cov_n_groups[filename][0])]
-        # Place all but first and last value into the arrays
-        for i in range(1, len(self.plots.cov_n_groups[filename])-1):
-            elows.append(float(self.plots.cov_n_groups[filename][i]))
-            ehighs.append(float(self.plots.cov_n_groups[filename][i]))
-        elows.append(float(self.plots.cov_n_groups[filename][-1]))
+        elows = self.plots.cov_groups[filename][1:]
+        ehighs = self.plots.cov_groups[filename][:-1]
 
-            # Sort the energy bounds and turn them back into strings
+        # Sort the energy bounds and turn them back into strings
         elows = [str(e) for e in sorted(elows)]
         ehighs = [str(e) for e in sorted(ehighs, reverse=True)]
+
+        # Update the tick step maximum
+        self.cov_tick_step_spinbox.setMaximum(len(ehighs)-1)
 
         # Clear the energy bound combo boxes
         self.cov_elow_box.clear()
@@ -531,6 +636,10 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         # Update the energy bound combo boxes
         self.cov_elow_box.addItems(elows)
         self.cov_ehigh_box.addItems(ehighs)
+
+        # Update the size for new text
+        self.cov_elow_box.resize(self.cov_elow_box.sizeHint())
+        self.cov_ehigh_box.resize(self.cov_ehigh_box.sizeHint())
 
     def sens_add_clicked(self):
         # For each drop down menu
@@ -614,12 +723,33 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
     def plot_cov(self):
         # If there is anything to plot
-        if len(self.sens_keys) > 0:
+        if len(self.cov_filenames) > 0:
+            mt_names = {v: k for k, v in mt_ids.items()}
+            # Get the mat and mt pairs
+            mat1 = self.mat_ids[self.cov_reac1_nuclide_box.currentText()]
+            mt1 = mt_names[self.cov_reac1_interaction_box.currentText()]
+            mat2 = self.mat_ids[self.cov_reac2_nuclide_box.currentText()]
+            mt2 = mt_names[self.cov_reac2_interaction_box.currentText()]
+            mat_mt_1 = (mat1, mt1)
+            mat_mt_2 = (mat2, mt2)
+            # Get the filename
+            filename = self.cov_file_box.currentText()
             # Get the high and low bounds
             elow = float(self.cov_elow_box.currentText())
             ehigh = float(self.cov_ehigh_box.currentText())
-            # Get the reaction to plot
-            key = tuple(self.cov_reaction_box.currentText().split())
+            # Get the selected colormapping
+            cmap = self.cov_cmap_box.currentText()
+            # Get the selected tick step
+            tick_step = self.cov_tick_step_spinbox.value()
+            # Get the selected mode for plotting setup
+            if self.research.isChecked():
+                mode = 'research'
+            elif self.publication.isChecked():
+                mode = 'publication'
+            # Stops 'QCoreApplication::exec: The event loop is already running' warning
+            plt.ion()
+            self.plots.heatmap_plot(mat_mt_1, mat_mt_2, filename, elow=elow, ehigh=ehigh,
+                                    cmap=cmap, tick_step=tick_step, mode=mode)
 
     def sens_file_grid_delete(self, widget):
         # Deletes a widget from the sensitivity file grid

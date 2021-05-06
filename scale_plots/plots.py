@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from math import ceil, log
 from scipy.stats import pearsonr
 from struct import unpack
-from scale_ids import mat_ids, mt_ids
+from scale_ids import mt_ids, elements, specials
 
 class Plots():
     '''Object that contains the functions needed
@@ -14,7 +14,7 @@ class Plots():
     def __init__(self):
         self.df = None
         self.cov_matrices = {}
-        self.cov_n_groups = {}
+        self.cov_groups = {}
 
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
@@ -136,24 +136,42 @@ class Plots():
         file_cont = unpack('>iiiiiii', full_file[file_cont_st: file_cont_end])
         num_energy_group = file_cont[0]
         num_neutron_group = file_cont[1]
+        num_gamma_group = file_cont[2]
         num_mat_mt = file_cont[4]
         num_matrix = file_cont[5]
 
         # Read file description length to skip it
         file_desc_len = unpack('>i', full_file[file_cont_end+4:file_cont_end+8])[0]
 
-        # Read in neutron energy groups
-        n_groups = np.array([])
-        n_start = file_cont_end + 8 + file_desc_len + 8
-        n_end = n_start + (num_neutron_group+1)*4
-        n_string = '>' + 'f'*(num_neutron_group+1)
-        n_groups = np.array(unpack(n_string, full_file[n_start:n_end]))
-        # Place the neutron groups into the groups dictionary
-        self.cov_n_groups[filename] = n_groups
-        n_end += 4
+        # Set to gamma start if no neutron energy groups are given
+        n_end = file_cont_end + 8 + file_desc_len + 4
+        # Read in neutron energy groups if available
+        n_groups = []
+        if num_neutron_group > 0:
+            n_start = file_cont_end + 8 + file_desc_len + 8
+            n_end = n_start + (num_neutron_group+1)*4
+            n_string = '>' + 'f'*(num_neutron_group+1)
+            n_groups = list(unpack(n_string, full_file[n_start:n_end]))
+            n_end += 4
+
+        # Set the gamma group ending to n_end if no groups available
+        g_end = n_end
+        # Read in gamma energy groups if available
+        g_groups = []
+        if num_gamma_group > 0:
+            g_start = n_end + 4
+            g_end = g_start + (num_gamma_group+1)*4
+            g_string = '>' + 'f'*(num_gamma_group+1)
+            g_groups = list(unpack(g_string, full_file[g_start:g_end]))
+            g_end += 4
+        
+        # Not sure what happens when both groups are present to make a set of them
+        for i in range(len(g_groups)):
+            n_groups.append(g_groups[i])
+        self.cov_groups[filename] = np.array(sorted(set(n_groups), reverse=True))
 
         # Increment past the material information sections
-        prev_end = n_end + 8 + num_mat_mt * 12 + num_mat_mt * (num_energy_group+1) * 8
+        prev_end = g_end + 8 + num_mat_mt * 12 + num_mat_mt * (num_energy_group+1) * 8
         # Read in the covariance matrices
         matrices = {}
         for _ in range(num_matrix):
@@ -204,6 +222,37 @@ class Plots():
         
         # Save the covariance matrices for this file
         self.cov_matrices[filename] = matrices
+
+    def get_mat_name(self, matid):
+        '''Translate the material ID into
+        the name. IDs are mostly the same
+        as MCNP IDs/1000 except for some
+        special cases that scale made
+        impossible to program without a dict.
+        '''
+        E = {v: k for k, v in elements.items()}
+        # Check for special cases
+        if matid // 1000000 > 0:
+            # One of the specials with 7 digits
+            return specials[matid]
+        elif matid == 1002:
+            # If H-2
+            return 'D'
+        # Extract the mass number
+        A = str(matid % 1000)
+        # Translate the atomic number
+        Z = E[matid // 1000]
+        return Z + '-' + A
+
+    def get_mt_name(self, mtid):
+        '''Same as get_mat_name
+        but used for reactions.
+        Sorry if the names make
+        no sense. I pulled directly
+        from the Scale documentation.
+        Check scale_ids.py for details.
+        '''
+        return mt_ids[mtid]
 
     def get_integral(self, key):
         '''Returns the integral value of the
@@ -405,7 +454,7 @@ class Plots():
             assert False, 'Material and Reaction pairs not found'
 
         # Filter the boundaries for ehigh and elow
-        max_bounds_full = self.cov_n_groups[filename][:-1]
+        max_bounds_full = self.cov_groups[filename][:-1]
         max_bounds = np.array([])
         indices = []
         for i in range(len(max_bounds_full)):
@@ -455,10 +504,10 @@ class Plots():
         plt.setp(ax.get_xticklabels(), rotation=45, ha='left', rotation_mode='anchor')
 
         # Put a title and axis titles on the plot
-        mat1 = mat_ids[mat_mt_pair[0]]
-        mt1 = mt_ids[mat_mt_pair[1]]
-        mat2 = mat_ids[mat_mt_pair[2]]
-        mt2 = mt_ids[mat_mt_pair[3]]
+        mat1 = self.get_mat_name(mat_mt_pair[0])
+        mt1 = self.get_mt_name(mat_mt_pair[1])
+        mat2 = self.get_mat_name(mat_mt_pair[2])
+        mt2 = self.get_mt_name(mat_mt_pair[3])
         ax.set_title('Relative Covariance for {} {} and {} {}\n'.format(mat1, mt1, mat2, mt2))
         ax.xaxis.set_label_position('top')
         ax.set_xlabel('{} {}'.format(mat1, mt1))
@@ -620,6 +669,7 @@ class Plots():
         plt.ylabel(ylabel)
         plt.title(title)
         plt.grid(b=True)
+        plt.tight_layout()
         plt.show()
 
     def __get_energy_bounds(self, elow, ehigh):
