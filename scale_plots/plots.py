@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from math import ceil, log
 from scipy.stats import pearsonr
+from struct import unpack
+from scale_ids import mt_ids, elements, specials
 
 class Plots():
     '''Object that contains the functions needed
@@ -11,7 +13,8 @@ class Plots():
 
     def __init__(self):
         self.df = None
-
+        self.cov_matrices = {}
+        self.cov_groups = {}
 
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
@@ -21,7 +24,7 @@ class Plots():
         ----------
         filename : str
             Name of the sdf file to parse.
-        
+
         Returns
         -------
         df : pandas.DataFrame
@@ -104,6 +107,153 @@ class Plots():
             self.df = pd.concat([self.df, new_df], axis=1)
         return self.df
 
+    def parse_coverx(self, full_filename):
+        '''Parse the covariance matrix file. Save the
+        matrices into a dictionary as well as the
+        energy groups.
+        An exlanation of the file format is located in
+        the parse_coverx jupyter notebook.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the covariance file to parse.
+
+        '''
+        filename = full_filename.split('/')[-1]
+        # Read in and save the full binary file
+        with open(full_filename, 'rb') as file:
+            full_file = file.read()
+
+        # Read the file identification length in bytes to skip
+        file_id_len = unpack('>i', full_file[0:4])[0]
+
+        # Start is file id length + 3 integers for sections length
+        file_cont_st = file_id_len + 12
+        # File control should always be 28 bytes
+        file_cont_end = file_cont_st + 28
+        # Read in file control values and store important ones
+        file_cont = unpack('>iiiiiii', full_file[file_cont_st: file_cont_end])
+        num_energy_group = file_cont[0]
+        num_neutron_group = file_cont[1]
+        num_gamma_group = file_cont[2]
+        num_mat_mt = file_cont[4]
+        num_matrix = file_cont[5]
+
+        # Read file description length to skip it
+        file_desc_len = unpack('>i', full_file[file_cont_end+4:file_cont_end+8])[0]
+
+        # Set to gamma start if no neutron energy groups are given
+        n_end = file_cont_end + 8 + file_desc_len + 4
+        # Read in neutron energy groups if available
+        n_groups = []
+        if num_neutron_group > 0:
+            n_start = file_cont_end + 8 + file_desc_len + 8
+            n_end = n_start + (num_neutron_group+1)*4
+            n_string = '>' + 'f'*(num_neutron_group+1)
+            n_groups = list(unpack(n_string, full_file[n_start:n_end]))
+            n_end += 4
+
+        # Set the gamma group ending to n_end if no groups available
+        g_end = n_end
+        # Read in gamma energy groups if available
+        g_groups = []
+        if num_gamma_group > 0:
+            g_start = n_end + 4
+            g_end = g_start + (num_gamma_group+1)*4
+            g_string = '>' + 'f'*(num_gamma_group+1)
+            g_groups = list(unpack(g_string, full_file[g_start:g_end]))
+            g_end += 4
+        
+        # Not sure what happens when both groups are present so make a set of them
+        for i in range(len(g_groups)):
+            n_groups.append(g_groups[i])
+        self.cov_groups[filename] = np.array(sorted(set(n_groups), reverse=True))
+
+        # Increment past the material information sections
+        prev_end = g_end + 8 + num_mat_mt * 12 + num_mat_mt * (num_energy_group+1) * 8
+        # Read in the covariance matrices
+        matrices = {}
+        for _ in range(num_matrix):
+            # Read in the matrix control data
+            # Setup to read 5 integers
+            matrix_cntrl_start = prev_end + 4
+            matrix_cntrl_end = matrix_cntrl_start + 20
+            matrix_cntrl = unpack('>iiiii', full_file[matrix_cntrl_start:matrix_cntrl_end])
+            mat_1 = matrix_cntrl[0]
+            reac_1 = matrix_cntrl[1]
+            mat_2 = matrix_cntrl[2]
+            reac_2 = matrix_cntrl[3]
+            # Iterate past number of bytes value
+            matrix_cntrl_end += 4
+
+            # Read in the block control values
+            block_cntrl = []
+            # Iterate past the number of bytes in block control value
+            block_cntrl_start = matrix_cntrl_end + 4
+            block_cntrl_end = block_cntrl_start + 2*num_energy_group*4 + 8
+            # Iterate through all energy groups
+            for j in range(num_energy_group):
+                start = block_cntrl_start + j*8
+                # Values per group and position of diagonal element for group
+                block_cntrl.append(unpack('>ii', full_file[start:start+8]))
+
+            # Read in the relative covariance matrix
+            matrix_start = block_cntrl_end + 4
+            prev_read = 0
+            # Initialize the matrix to an array of zeros
+            matrix = np.zeros((num_energy_group, num_energy_group), dtype=float)
+            col = 0
+            # For each energy grouping
+            for num_vals, diag_pos in block_cntrl:
+                # Read in each energy group's column
+                start = matrix_start + prev_read
+                end = start + num_vals*4
+                string = '>' + 'f'*num_vals
+                full_col = unpack(string, full_file[start:end])
+                for row in range(num_vals):
+                    # Place the values so the diagonal position is in the diagonal
+                    matrix[col+row-diag_pos+1][col] = full_col[row]
+                # Update the previous read value to past this energy groups
+                prev_read += num_vals*4
+                col += 1
+            matrices[(mat_1, reac_1, mat_2, reac_2)] = matrix
+            prev_end = end + 4
+        
+        # Save the covariance matrices for this file
+        self.cov_matrices[filename] = matrices
+
+    def get_mat_name(self, matid):
+        '''Translate the material ID into
+        the name. IDs are mostly the same
+        as MCNP IDs/1000 except for some
+        special cases that scale made
+        impossible to program without a dict.
+        '''
+        E = {v: k for k, v in elements.items()}
+        # Check for special cases
+        if matid // 1000000 > 0:
+            # One of the specials with 7 digits
+            return specials[matid]
+        elif matid == 1002:
+            # If H-2
+            return 'D'
+        # Extract the mass number
+        A = str(matid % 1000)
+        # Translate the atomic number
+        Z = E[matid // 1000]
+        return Z + '-' + A
+
+    def get_mt_name(self, mtid):
+        '''Same as get_mat_name
+        but used for reactions.
+        Sorry if the names make
+        no sense. I pulled directly
+        from the Scale documentation.
+        Check scale_ids.py for details.
+        '''
+        return mt_ids[mtid]
+
     def get_integral(self, key):
         '''Returns the integral value of the
         sensitivity data and the uncertainty.
@@ -173,7 +323,7 @@ class Plots():
                 if lethargy is False:
                     sens_x = sens_x/lethargies
                     sens_y = sens_y/lethargies
-                
+
                 r[(tuple(keys[i]),tuple(keys[j]))] = pearsonr(sens_x, sens_y)[0]
         return r
 
@@ -258,6 +408,116 @@ class Plots():
 
         # Send the data to the plot making function
         self.__make_plot(keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr, plot_lethargy, legend_dict, r_pos, ylabel)
+
+    def heatmap_plot(self, mat_mt_1, mat_mt_2, filename, elow=float('-inf'), ehigh=float('inf'),
+                     cmap='viridis', tick_step=1, mode='publication'):
+        '''Create a heatmap of the relative covariance matrix for
+        the selected material and reaction pair.
+
+        Parameters
+        ----------
+        mat_mt_1 : tuple
+            The material and reaction id number
+            for one of the cross sections.
+        mat_mt_2 : tuple
+            The material and reaction id number
+            for the second cross sectionss.
+        filename : str
+            Name of the file that where the matrix
+            was found. 
+        elow : float, optional
+            The low bound for energies to plot.
+            Defaults to -inf.
+        ehigh : float, optional
+            The high bound for energies to plot.
+            Defaults to inf.
+        cmap : str, optional
+            Color mapping to be used for heatmap.
+            Can be set as any Matplotlib cmap.
+        tick_step : int, optional
+            How often the tick marks should be
+            placed on axis.
+        mode : str, optional
+            Can be either 'research' or
+            'publication'. Research is geared towards
+            finding the group and value for a covariance value
+            while publication looks more like the heatmaps
+            found in published papers.
+        
+        '''
+        # Figure out which nuclide and reaction should come first in the key
+        if tuple([mat_mt_1[0], mat_mt_1[1], mat_mt_2[0],  mat_mt_2[1]]) in self.cov_matrices[filename].keys():
+            mat_mt_pair = tuple([mat_mt_1[0], mat_mt_1[1], mat_mt_2[0],  mat_mt_2[1]])
+        elif tuple([mat_mt_2[0], mat_mt_2[1], mat_mt_1[0],  mat_mt_1[1]]) in self.cov_matrices[filename].keys():
+            mat_mt_pair = tuple([mat_mt_2[0], mat_mt_2[1], mat_mt_1[0],  mat_mt_1[1]])
+        else:
+            assert False, 'Material and Reaction pairs not found'
+
+        # Filter the boundaries for ehigh and elow
+        max_bounds_full = self.cov_groups[filename][:-1]
+        max_bounds = np.array([])
+        indices = []
+        for i in range(len(max_bounds_full)):
+            if max_bounds_full[i] <= ehigh and max_bounds_full[i] > elow:
+                max_bounds = np.append(max_bounds, max_bounds_full[i])
+                indices.append(i)
+        # Grab the indices of the maximum and minimum energy bound
+        i_max = indices[0]
+        i_min = indices[-1]+1
+
+        # Grab the matrix data
+        matrix_full = self.cov_matrices[filename][mat_mt_pair]
+        matrix = matrix_full[i_max:i_min, i_max:i_min]
+
+        #Turn the matrix into a heatmap
+        fig, ax = plt.subplots()
+        fig.set_size_inches(13.25, 10)
+        im = ax.imshow(matrix, cmap=cmap, interpolation='none')
+        
+        # Show the colorbar
+        cbar = ax.figure.colorbar(im, ax=ax)
+
+        # Set the tick labels for either mode
+        if mode == 'publication':
+            # Make the labels show the max energy bounds
+            ax.set_xticks(np.arange(0, len(indices), tick_step))
+            ax.set_yticks(np.arange(0, len(indices), tick_step))
+            # Make labels in scientific notation with 2 decimal places
+            labels = ['{:.2e}'.format(bound) for bound in max_bounds][::tick_step]
+            ax.set_xticklabels(labels)
+            ax.set_yticklabels(labels)
+        elif mode == 'research':
+            # Make the labels show the energy groups index
+            # Preserves the x and y coordinates in top right corner
+            ax.set_xticks(np.arange(0, len(indices), tick_step))
+            ax.set_yticks(np.arange(0, len(indices), tick_step))
+            # Put the max energy bounds on the right of the plot
+            s1 = 'Max Bounds (eV)\n'
+            s2 = '\n'.join(['{}-{} : {:.2e}'.format(i-0.5, i+0.5, max_bounds[i]) for i in range(0,len(indices),tick_step)])
+            ax.text(float(-len(indices))/3.45, len(indices)/2, s1+s2, ha='left', va='center')
+        else:
+            assert False, "mode must be either 'research' or 'mode' not '{}'".format(mode)
+
+        # Place x axis ticks on top
+        ax.xaxis.tick_top()
+        # Rotate the x axis tick labels by 45 degrees.
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='left', rotation_mode='anchor')
+
+        # Put a title and axis titles on the plot
+        mat1 = self.get_mat_name(mat_mt_pair[0])
+        mt1 = self.get_mt_name(mat_mt_pair[1])
+        mat2 = self.get_mat_name(mat_mt_pair[2])
+        mt2 = self.get_mt_name(mat_mt_pair[3])
+        ax.set_title('Relative Covariance for {} {} and {} {}\n'.format(mat1, mt1, mat2, mt2))
+        ax.xaxis.set_label_position('top')
+        ax.set_xlabel('{} {}'.format(mat1, mt1))
+        ax.set_ylabel('{} {}'.format(mat2, mt2))
+        cbar.set_label('Relative Covariance')
+
+        # Make the layout tight and show the plot
+        for _ in range(5):
+            fig.tight_layout()
+        plt.show()
 
     def __make_plot(self, keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr,
                     plot_lethargy, legend_dict, r_pos, ylabel):
@@ -369,11 +629,11 @@ class Plots():
                     assert plot_fill_bet is False, 'plot_err_bar and plot_fill_bet cannot both be True' 
                     # Plot the error bars
                     mid_vals = np.power(10, (np.log10(energy_vals[::2]) + np.log10(energy_vals[1::2]))/2)
-                    plotline, caps, eb = plt.errorbar(mid_vals, sens, yerr=stdevs, fmt='none', ecolor=colors[i%6], elinewidth=1, capsize=2, capthick=1)
+                    _, _, eb = plt.errorbar(mid_vals, sens, yerr=stdevs, fmt='none', ecolor=colors[i%6], elinewidth=1, capsize=2, capthick=1)
                     eb[0].set_linestyle(':')
                 elif plot_fill_bet:
                     # Plot the std dev as a fill between
-                    plt.fill_between(energy_vals, sens_step-stdev_step, sens_step+stdev_step, ls=ls[i//6], color=colors[i%6], alpha=0.3)              
+                    plt.fill_between(energy_vals, sens_step-stdev_step, sens_step+stdev_step, ls=ls[i//6], color=colors[i%6], alpha=0.3)
 
             # Add the integral value information
             int_value, int_unc = self.get_integral(key)
@@ -409,6 +669,7 @@ class Plots():
         plt.ylabel(ylabel)
         plt.title(title)
         plt.grid(b=True)
+        plt.tight_layout()
         plt.show()
 
     def __get_energy_bounds(self, elow, ehigh):
@@ -427,4 +688,3 @@ class Plots():
                 # Calculate the lethargies for each energy grouping
                 lethargies = np.append(lethargies, log(e_upper/e_lower))
         return indices, energy_vals, lethargies
-
