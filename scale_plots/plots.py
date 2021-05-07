@@ -436,7 +436,8 @@ class Plots():
         self.__make_plot(keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr, plot_lethargy, legend_dict, r_pos, ylabel)
 
     def heatmap_plot(self, mat_mt_1, mat_mt_2, filename, covariance=True, elow=float('-inf'),
-                     ehigh=float('inf'), cmap='viridis', tick_step=1, mode='publication'):
+                     ehigh=float('inf'), cmap='viridis', tick_step=1, mode='publication',
+                     label1=None, label2=None):
         '''Create a heatmap of the covariance or
         correlation matrix for the selected material
         and reaction pair.
@@ -473,6 +474,10 @@ class Plots():
             finding the group and value for a matrix spot
             while publication looks more like the heatmaps
             found in published papers.
+        label1 : str, optional
+            Desired text for the first nuclide and reaction
+        label2 : str, optional
+            Desired text for the second nuclide and reaction
         
         '''
         # Figure out which nuclide and reaction should come first in the key
@@ -542,15 +547,17 @@ class Plots():
         # Rotate the x axis tick labels by 45 degrees.
         plt.setp(ax.get_xticklabels(), rotation=45, ha='left', rotation_mode='anchor')
 
+        # Put the IDs into readable text
+        if label1 is None:
+            label1 = self.get_mat_name(mat_mt_1[0])
+            label1 += ' '
+            label1 += self.get_mt_name(mat_mt_1[1])
+        if label2 is None:
+            label1 = self.get_mat_name(mat_mt_2[0])
+            label1 += ' '
+            label1 += self.get_mt_name(mat_mt_2[1])
         # Put a title and axis titles on the plot
-        mat1 = self.get_mat_name(mat_mt_pair[0])
-        mt1 = self.get_mt_name(mat_mt_pair[1])
-        mat2 = self.get_mat_name(mat_mt_pair[2])
-        mt2 = self.get_mt_name(mat_mt_pair[3])
-        ax.set_title('{} matrix for {} {} and {} {}\n'.format(st, mat1, mt1, mat2, mt2))
-        ax.xaxis.set_label_position('top')
-        ax.set_xlabel('{} {}'.format(mat1, mt1))
-        ax.set_ylabel('{} {}'.format(mat2, mt2))
+        ax.set_title('{} matrix for {} and {}'.format(st, label1, label2))
         cbar.set_label(st)
 
         # Make the layout tight and show the plot

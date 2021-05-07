@@ -751,10 +751,14 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
                 mode = 'research'
             elif self.publication.isChecked():
                 mode = 'publication'
+            # Get the labels for the reactions
+            label1 = self.cov_reac1_label_edit.text()
+            label2 = self.cov_reac2_label_edit.text()
             # Stops 'QCoreApplication::exec: The event loop is already running' warning
             plt.ion()
             self.plots.heatmap_plot(mat_mt_1, mat_mt_2, filename, covariance=covariance, elow=elow,
-                                    ehigh=ehigh, cmap=cmap, tick_step=tick_step, mode=mode)
+                                    ehigh=ehigh, cmap=cmap, tick_step=tick_step, mode=mode,
+                                    label1=label1, label2=label2)
 
     def sens_file_grid_delete(self, widget):
         # Deletes a widget from the sensitivity file grid
