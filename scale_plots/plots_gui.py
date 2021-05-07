@@ -22,6 +22,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.sens_keys = []
         self.labels = []
         self.legend_entry_edits = {}
+        self.mat_ids = {}
         # Color mapping options
         self.cmaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis',
                       'PiYG', 'PRGn', 'BrBG', 'RdBu', 'bwr']
@@ -331,10 +332,15 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.cov_cmap_box.addItems(self.cmaps)
         self.cov_extra_options_layout.addWidget(self.cov_cmap_box, 2, 3)
 
-        # Create the relative covariance plotting button
-        self.plot_rel_cov_btn = PyQt5.QtWidgets.QPushButton('Plot Relative Covariance Matrix')
-        self.plot_rel_cov_btn.clicked.connect(self.plot_cov)
-        self.cov_layout.addWidget(self.plot_rel_cov_btn, 11)
+        # Create the covariance plotting button
+        self.plot_cov_btn = PyQt5.QtWidgets.QPushButton('Plot Covariance Matrix')
+        self.plot_cov_btn.clicked.connect(self.plot_cov)
+        self.cov_layout.addWidget(self.plot_cov_btn, 11)
+
+        # Create the correlation plotting button
+        self.plot_corr_btn = PyQt5.QtWidgets.QPushButton('Plot Correlation Matrix')
+        self.plot_corr_btn.clicked.connect(self.plot_cov)
+        self.cov_layout.addWidget(self.plot_corr_btn, 12)
 
     def parse_sens_file(self):
         # Let the user pick the sdf file to read in
@@ -387,7 +393,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             self.cov_filenames.append(cov_filename.split('/')[-1])
 
             # Create dictionaries for mat IDs
-            self.mat_ids = {}
             for mat1, _, mat2, _ in self.plots.cov_matrices[cov_filename.split('/')[-1]].keys():
                 # Create a dictionary for names and IDs to sort
                 self.mat_ids[self.plots.get_mat_name(mat1)] = mat1
@@ -729,6 +734,11 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
             mat_mt_2 = (mat2, mt2)
             # Get the filename
             filename = self.cov_file_box.currentText()
+            # Get the desired type of matrix plot
+            if self.sender() == self.plot_cov_btn:
+                covariance = True
+            else:
+                covariance = False
             # Get the high and low bounds
             elow = float(self.cov_elow_box.currentText())
             ehigh = float(self.cov_ehigh_box.currentText())
@@ -743,8 +753,8 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
                 mode = 'publication'
             # Stops 'QCoreApplication::exec: The event loop is already running' warning
             plt.ion()
-            self.plots.heatmap_plot(mat_mt_1, mat_mt_2, filename, elow=elow, ehigh=ehigh,
-                                    cmap=cmap, tick_step=tick_step, mode=mode)
+            self.plots.heatmap_plot(mat_mt_1, mat_mt_2, filename, covariance=covariance, elow=elow,
+                                    ehigh=ehigh, cmap=cmap, tick_step=tick_step, mode=mode)
 
     def sens_file_grid_delete(self, widget):
         # Deletes a widget from the sensitivity file grid

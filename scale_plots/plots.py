@@ -15,6 +15,7 @@ class Plots():
         self.df = None
         self.cov_matrices = {}
         self.cov_groups = {}
+        self.mat_xs = {}
 
     def sdf_to_df(self, filename):
         '''Parse the keno sdf output file into
@@ -126,52 +127,77 @@ class Plots():
             full_file = file.read()
 
         # Read the file identification length in bytes to skip
+        # Find out if the file is big or little endian
+        # Scale decided to switch that for some of their libraries
         file_id_len = unpack('>i', full_file[0:4])[0]
+        # If the length is massive its little-endian
+        if file_id_len > 1000:
+            sym = '<'
+            file_id_len = unpack('<i', full_file[0:4])[0]
+        else:
+            sym = '>'
 
         # Start is file id length + 3 integers for sections length
         file_cont_st = file_id_len + 12
         # File control should always be 28 bytes
         file_cont_end = file_cont_st + 28
         # Read in file control values and store important ones
-        file_cont = unpack('>iiiiiii', full_file[file_cont_st: file_cont_end])
+        file_cont = unpack(sym+'iiiiiii', full_file[file_cont_st: file_cont_end])
         num_energy_group = file_cont[0]
         num_neutron_group = file_cont[1]
-        num_gamma_group = file_cont[2]
         num_mat_mt = file_cont[4]
         num_matrix = file_cont[5]
 
         # Read file description length to skip it
-        file_desc_len = unpack('>i', full_file[file_cont_end+4:file_cont_end+8])[0]
+        file_desc_len = unpack(sym+'i', full_file[file_cont_end+4:file_cont_end+8])[0]
 
-        # Set to gamma start if no neutron energy groups are given
-        n_end = file_cont_end + 8 + file_desc_len + 4
-        # Read in neutron energy groups if available
-        n_groups = []
-        if num_neutron_group > 0:
-            n_start = file_cont_end + 8 + file_desc_len + 8
-            n_end = n_start + (num_neutron_group+1)*4
-            n_string = '>' + 'f'*(num_neutron_group+1)
-            n_groups = list(unpack(n_string, full_file[n_start:n_end]))
-            n_end += 4
-
-        # Set the gamma group ending to n_end if no groups available
-        g_end = n_end
-        # Read in gamma energy groups if available
-        g_groups = []
-        if num_gamma_group > 0:
-            g_start = n_end + 4
-            g_end = g_start + (num_gamma_group+1)*4
-            g_string = '>' + 'f'*(num_gamma_group+1)
-            g_groups = list(unpack(g_string, full_file[g_start:g_end]))
-            g_end += 4
+        n_start = file_cont_end + 8 + file_desc_len + 8
+        n_end = n_start + (num_neutron_group+1)*4
+        n_string = sym + 'f'*(num_neutron_group+1)
+        n_groups = np.array(unpack(n_string, full_file[n_start:n_end]))
+        n_end += 4
         
-        # Not sure what happens when both groups are present so make a set of them
-        for i in range(len(g_groups)):
-            n_groups.append(g_groups[i])
-        self.cov_groups[filename] = np.array(sorted(set(n_groups), reverse=True))
+        # Add the neutron groups to the groups dictionary
+        self.cov_groups[filename] = n_groups
 
-        # Increment past the material information sections
-        prev_end = g_end + 8 + num_mat_mt * 12 + num_mat_mt * (num_energy_group+1) * 8
+        # Read in the material reaction control data
+        mat_controls = []
+        for i in range(num_mat_mt):
+            # Setup for 3 integers
+            mat_start = n_end + 4 + i*12
+            mat_end = mat_start + 8
+            # Mat ID, Reaction ID, xs weighting option 1-5
+            mat_controls.append(unpack(sym+'ii', full_file[mat_start:mat_end]))
+        mat_end += 4
+
+        # Read in the material cross sections and errors into a nested dict
+        file_xs_dict = {}
+        # Iterate through all material reactions
+        for i in range(num_mat_mt):
+            file_mat_xs = {}
+            # Setup for number of energy groups floats
+            xs_start = mat_end + i*(num_energy_group+1)*8 + 8
+            xs_end = xs_start + num_energy_group*4
+            xs_string = sym + 'f'*num_energy_group
+            # Read in the cross sections for current material reaction
+            file_mat_xs['xs'] = list(unpack(xs_string, full_file[xs_start:xs_end]))
+            
+            # Setup for number of energy groups floats
+            err_start = xs_end
+            err_end = err_start + num_energy_group*4
+            err_string = xs_string
+            # Read in the cross section errors for current material reaction
+            file_mat_xs['std'] = list(unpack(err_string, full_file[err_start:err_end]))
+            
+            # Put the xs and error in the full xs dictionary
+            file_xs_dict[mat_controls[i]] = file_mat_xs
+
+        err_end += 4
+        # Put the xs information in the saved dictionary
+        self.mat_xs[filename] = file_xs_dict
+
+        # Start prev_end at start of the matrices section
+        prev_end = err_end
         # Read in the covariance matrices
         matrices = {}
         for _ in range(num_matrix):
@@ -179,7 +205,7 @@ class Plots():
             # Setup to read 5 integers
             matrix_cntrl_start = prev_end + 4
             matrix_cntrl_end = matrix_cntrl_start + 20
-            matrix_cntrl = unpack('>iiiii', full_file[matrix_cntrl_start:matrix_cntrl_end])
+            matrix_cntrl = unpack(sym+'iiiii', full_file[matrix_cntrl_start:matrix_cntrl_end])
             mat_1 = matrix_cntrl[0]
             reac_1 = matrix_cntrl[1]
             mat_2 = matrix_cntrl[2]
@@ -196,7 +222,7 @@ class Plots():
             for j in range(num_energy_group):
                 start = block_cntrl_start + j*8
                 # Values per group and position of diagonal element for group
-                block_cntrl.append(unpack('>ii', full_file[start:start+8]))
+                block_cntrl.append(unpack(sym+'ii', full_file[start:start+8]))
 
             # Read in the relative covariance matrix
             matrix_start = block_cntrl_end + 4
@@ -209,7 +235,7 @@ class Plots():
                 # Read in each energy group's column
                 start = matrix_start + prev_read
                 end = start + num_vals*4
-                string = '>' + 'f'*num_vals
+                string = sym + 'f'*num_vals
                 full_col = unpack(string, full_file[start:end])
                 for row in range(num_vals):
                     # Place the values so the diagonal position is in the diagonal
@@ -409,10 +435,11 @@ class Plots():
         # Send the data to the plot making function
         self.__make_plot(keys, elow, ehigh, plot_err_bar, plot_fill_bet, plot_corr, plot_lethargy, legend_dict, r_pos, ylabel)
 
-    def heatmap_plot(self, mat_mt_1, mat_mt_2, filename, elow=float('-inf'), ehigh=float('inf'),
-                     cmap='viridis', tick_step=1, mode='publication'):
-        '''Create a heatmap of the relative covariance matrix for
-        the selected material and reaction pair.
+    def heatmap_plot(self, mat_mt_1, mat_mt_2, filename, covariance=True, elow=float('-inf'),
+                     ehigh=float('inf'), cmap='viridis', tick_step=1, mode='publication'):
+        '''Create a heatmap of the covariance or
+        correlation matrix for the selected material
+        and reaction pair.
 
         Parameters
         ----------
@@ -425,6 +452,9 @@ class Plots():
         filename : str
             Name of the file that where the matrix
             was found. 
+        covariance : bool, optional
+            If true the covariance matrix is plotted.
+            If false the correlation matrix is plotted.
         elow : float, optional
             The low bound for energies to plot.
             Defaults to -inf.
@@ -440,7 +470,7 @@ class Plots():
         mode : str, optional
             Can be either 'research' or
             'publication'. Research is geared towards
-            finding the group and value for a covariance value
+            finding the group and value for a matrix spot
             while publication looks more like the heatmaps
             found in published papers.
         
@@ -466,7 +496,15 @@ class Plots():
         i_min = indices[-1]+1
 
         # Grab the matrix data
-        matrix_full = self.cov_matrices[filename][mat_mt_pair]
+        if covariance:
+            matrix_full = self.cov_matrices[filename][mat_mt_pair]
+            st = 'Covariance'
+
+        else:
+            # Calculate the correlation matrix
+            matrix_full = self.__cov_to_corr(mat_mt_pair, filename)
+            st = 'Correlation'
+        # Index the matrix data
         matrix = matrix_full[i_max:i_min, i_max:i_min]
 
         #Turn the matrix into a heatmap
@@ -476,7 +514,6 @@ class Plots():
         
         # Show the colorbar
         cbar = ax.figure.colorbar(im, ax=ax)
-
         # Set the tick labels for either mode
         if mode == 'publication':
             # Make the labels show the max energy bounds
@@ -498,8 +535,10 @@ class Plots():
         else:
             assert False, "mode must be either 'research' or 'mode' not '{}'".format(mode)
 
-        # Place x axis ticks on top
+        # Place x axis tick labels on top
         ax.xaxis.tick_top()
+        # Put tick marks on all sides
+        ax.tick_params(bottom=True, top=True, left=True, right=True)
         # Rotate the x axis tick labels by 45 degrees.
         plt.setp(ax.get_xticklabels(), rotation=45, ha='left', rotation_mode='anchor')
 
@@ -508,11 +547,11 @@ class Plots():
         mt1 = self.get_mt_name(mat_mt_pair[1])
         mat2 = self.get_mat_name(mat_mt_pair[2])
         mt2 = self.get_mt_name(mat_mt_pair[3])
-        ax.set_title('Relative Covariance for {} {} and {} {}\n'.format(mat1, mt1, mat2, mt2))
+        ax.set_title('{} matrix for {} {} and {} {}\n'.format(st, mat1, mt1, mat2, mt2))
         ax.xaxis.set_label_position('top')
         ax.set_xlabel('{} {}'.format(mat1, mt1))
         ax.set_ylabel('{} {}'.format(mat2, mt2))
-        cbar.set_label('Relative Covariance')
+        cbar.set_label(st)
 
         # Make the layout tight and show the plot
         for _ in range(5):
@@ -688,3 +727,19 @@ class Plots():
                 # Calculate the lethargies for each energy grouping
                 lethargies = np.append(lethargies, log(e_upper/e_lower))
         return indices, energy_vals, lethargies
+
+    def __cov_to_corr(self, mat_mt_pair, filename):
+        # Grab the covariance matrix
+        cov_mat = self.cov_matrices[filename][mat_mt_pair]
+        num_groups = len(cov_mat)
+        mat_mt1 = (mat_mt_pair[0], mat_mt_pair[1])
+        mat_mt2 = (mat_mt_pair[2], mat_mt_pair[3])
+        # Initialize correlation matrix
+        corr = np.zeros((num_groups, num_groups))
+        for i in range(num_groups):
+            for j in range(num_groups):
+                # corr[i][j] = cov[i][j] / (xs_error[i] * xs_error[j])
+                std1 = self.mat_xs[filename][mat_mt1]['std'][i]
+                std2 = self.mat_xs[filename][mat_mt2]['std'][j]
+                corr[i][j] =  cov_mat[i][j] / (std1 * std2)
+        return corr
