@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 from math import ceil, log
 from scipy.stats import pearsonr
 from struct import unpack
-from scale_ids import mt_ids, elements, specials
+
+import scale_plots
+from .scale_ids import mt_ids, elements, specials
 
 class Plots():
-    '''Object that contains the functions needed
+    '''Object that contains the functions needed 
     to parse and plot the data from a sdf file.
     '''
 
@@ -18,7 +20,7 @@ class Plots():
         self.mat_xs = {}
 
     def sdf_to_df(self, filename):
-        '''Parse the keno sdf output file into
+        '''Parse the keno sdf output file into 
         a pandas DataFrame.
 
         Parameters
@@ -34,6 +36,10 @@ class Plots():
 
         '''
         data = {}
+        # Check for an sdf file
+        if filename[-4:] != '.sdf':
+            print("File must be a '.sdf' file.")
+            return
         experiment = filename[:-4].split('/')[-1]
         type_a = False
         type_b = False
@@ -108,11 +114,11 @@ class Plots():
             self.df = pd.concat([self.df, new_df], axis=1)
         return self.df
 
-    def parse_coverx(self, full_filename):
-        '''Parse the covariance matrix file. Save the
-        matrices into a dictionary as well as the
-        energy groups.
-        An exlanation of the file format is located in
+    def parse_coverx(self, filename):
+        '''Parse the covariance matrix file. Save the 
+        matrices into a dictionary as well as the 
+        energy groups. 
+        An exlanation of the file format is located in 
         the parse_coverx jupyter notebook.
 
         Parameters
@@ -121,9 +127,13 @@ class Plots():
             Name of the covariance file to parse.
 
         '''
-        filename = full_filename.split('/')[-1]
+        fname = filename.split('/')[-1]
+        # Check for the file not being a covariance file
+        if fname[0:6] != 'scale.' and 'groupcov' not in fname:
+            print('File must be a scale covariance file.')
+            return
         # Read in and save the full binary file
-        with open(full_filename, 'rb') as file:
+        with open(filename, 'rb') as file:
             full_file = file.read()
 
         # Read the file identification length in bytes to skip
@@ -158,7 +168,7 @@ class Plots():
         n_end += 4
         
         # Add the neutron groups to the groups dictionary
-        self.cov_groups[filename] = n_groups
+        self.cov_groups[fname] = n_groups
 
         # Read in the material reaction control data
         mat_controls = []
@@ -194,7 +204,7 @@ class Plots():
 
         err_end += 4
         # Put the xs information in the saved dictionary
-        self.mat_xs[filename] = file_xs_dict
+        self.mat_xs[fname] = file_xs_dict
 
         # Start prev_end at start of the matrices section
         prev_end = err_end
@@ -247,13 +257,13 @@ class Plots():
             prev_end = end + 4
         
         # Save the covariance matrices for this file
-        self.cov_matrices[filename] = matrices
+        self.cov_matrices[fname] = matrices
 
     def get_mat_name(self, matid):
-        '''Translate the material ID into
-        the name. IDs are mostly the same
-        as MCNP IDs/1000 except for some
-        special cases that scale made
+        '''Translate the material ID into 
+        the name. IDs are mostly the same 
+        as MCNP IDs/1000 except for some 
+        special cases that scale made 
         impossible to program without a dict.
         '''
         E = {v: k for k, v in elements.items()}
@@ -271,23 +281,23 @@ class Plots():
         return Z + '-' + A
 
     def get_mt_name(self, mtid):
-        '''Same as get_mat_name
-        but used for reactions.
-        Sorry if the names make
-        no sense. I pulled directly
-        from the Scale documentation.
+        '''Same as get_mat_name 
+        but used for reactions. 
+        Sorry if the names make 
+        no sense. I pulled directly 
+        from the Scale documentation. 
         Check scale_ids.py for details.
         '''
         return mt_ids[mtid]
 
     def get_integral(self, key):
-        '''Returns the integral value of the
+        '''Returns the integral value of the 
         sensitivity data and the uncertainty.
 
         Parameters
         ----------
         key : list
-            Indices in the pandas DataFrame where the desired
+            Indices in the pandas DataFrame where the desired 
             sensitivities are stored.
 
         Returns
@@ -317,22 +327,22 @@ class Plots():
         Parameters
         ----------
         keys : list of lists
-            Indices in the pandas DataFrame where the desired
+            Indices in the pandas DataFrame where the desired 
             data is stored.
         elow : float, optional
-            The low bound for energies to calculate correlation.
+            The low bound for energies to calculate correlation. 
             Defaults to -inf.
         ehigh : float, optional
-            The high bound for energies to calculate correlation.
+            The high bound for energies to calculate correlation. 
             Defaults to inf.
         lethargy : bool, optional
-            Whether to find the correlation between sensitivites
+            Whether to find the correlation between sensitivites 
             in unit lethargy. Defaults to False.
 
         Returns
         -------
         r : dict
-            key : tuple of tuples for keys
+            key : tuple of tuples for keys 
             value : correlation coefficient for the 2 reactions in the key
 
         '''
@@ -355,36 +365,36 @@ class Plots():
 
     def sensitivity_plot(self, keys, elow=float('-inf'), ehigh=float('inf'), plot_err_bar=True,
                          plot_fill_bet=False, plot_corr=False, legend_dict=None, r_pos='bottom right'):
-        '''Plot the sensitivites for the given isotopes, reactions,
-        unit numbers, and region numbers. Creates a matplotlib.pyplot
+        '''Plot the sensitivites for the given isotopes, reactions, 
+        unit numbers, and region numbers. Creates a matplotlib.pyplot 
         step plot for the energy bounds from the DataFrame.
 
         Parameters
         ----------
         keys : list of lists
-            Indices in the pandas DataFrame where the desired
+            Indices in the pandas DataFrame where the desired 
             sensitivities are stored.
         elow : float, optional
-            The low bound for energies to plot.
+            The low bound for energies to plot. 
             Defaults to -inf.
         ehigh : float, optional
-            The high bound for energies to plot.
+            The high bound for energies to plot. 
             Defaults to inf.
         plot_err_bar : bool, optional
-            Whether the user wants the error bars to be included
+            Whether the user wants the error bars to be included 
             in the generated plot. Defaults to True.
         plot_fill_bet : bool, optional
-            Whether the user wants the error to be plotted as a
+            Whether the user wants the error to be plotted as a 
             fill between. Defaults to False.
         plot_corr : bool, optional
-            Whether the user wants the correlation coefficient to
+            Whether the user wants the correlation coefficient to 
             be given in the plot. Defaults to False.
         legend_dict : dictionary, optional
-            keys : key in the keys list of the selected isotope
+            keys : key in the keys list of the selected isotope 
             value : string to replace the automatically generated legend
         r_pos : str, optional
-            Where the correlation coefficient should go on the plot.
-            Defaults to 'bottom right'. Can also be 'top right',
+            Where the correlation coefficient should go on the plot. 
+            Defaults to 'bottom right'. Can also be 'top right', 
             'bottom left', and 'top left'.
 
         '''
@@ -396,36 +406,36 @@ class Plots():
 
     def sensitivity_lethargy_plot(self, keys, elow=float('-inf'), ehigh=float('inf'), plot_err_bar=True,
                                   plot_fill_bet=False, plot_corr=False, legend_dict=None, r_pos='bottom right'):
-        '''Plot the sensitivites per unit lethargy for the given isotopes,
-        reactions, unit numbers, and region numbers. Creates a matplotlib.pyplot
+        '''Plot the sensitivites per unit lethargy for the given isotopes, 
+        reactions, unit numbers, and region numbers. Creates a matplotlib.pyplot 
         step plot for the energy bounds from the DataFrame.
 
         Parameters
         ----------
         keys : list of lists
-            Indices in the pandas DataFrame where the desired
+            Indices in the pandas DataFrame where the desired 
             sensitivities are stored.
         elow : float, optional
-            The low bound for energies to plot.
+            The low bound for energies to plot. 
             Defaults to -inf.
         ehigh : float, optional
-            The high bound for energies to plot.
+            The high bound for energies to plot. 
             Defaults to inf.
         plot_err_bar : bool, optional
-            Whether the user wants the error bars to be included
+            Whether the user wants the error bars to be included 
             in the generated plot. Defaults to True.
         plot_fill_bet : bool, optional
-            Whether the user wants the error to be plotted as a
+            Whether the user wants the error to be plotted as a 
             fill between. Defaults to False.
         plot_corr : bool, optional
-            Whether the user wants the correlation coefficient to
+            Whether the user wants the correlation coefficient to 
             be given in the plot. Defaults to False
         legend_dict : dictionary, optional
-            keys : key in the keys list of the selected isotope
+            keys : key in the keys list of the selected isotope 
             value : string to replace the automatically generated legend
         r_pos : str, optional
-            Where the correlation coefficient should go on the plot.
-            Defaults to 'bottom right'. Can also be 'top right',
+            Where the correlation coefficient should go on the plot. 
+            Defaults to 'bottom right'. Can also be 'top right', 
             'bottom left', and 'top left'.
 
         '''
@@ -438,46 +448,46 @@ class Plots():
     def heatmap_plot(self, mat_mt_1, mat_mt_2, filename, covariance=True, elow=float('-inf'),
                      ehigh=float('inf'), cmap='viridis', tick_step=1, mode='publication',
                      label1=None, label2=None):
-        '''Create a heatmap of the covariance or
-        correlation matrix for the selected material
-        and reaction pair.
+        '''Create a heatmap of the covariance or 
+        correlation matrix for the selected material 
+        and reaction pairs.
 
         Parameters
         ----------
         mat_mt_1 : tuple
-            The material and reaction id number
+            The material and reaction id number 
             for one of the cross sections.
         mat_mt_2 : tuple
-            The material and reaction id number
+            The material and reaction id number 
             for the second cross sectionss.
         filename : str
-            Name of the file that where the matrix
+            Name of the file that where the matrix 
             was found. 
         covariance : bool, optional
-            If true the covariance matrix is plotted.
+            If true the covariance matrix is plotted. 
             If false the correlation matrix is plotted.
         elow : float, optional
-            The low bound for energies to plot.
+            The low bound for energies to plot. 
             Defaults to -inf.
         ehigh : float, optional
-            The high bound for energies to plot.
+            The high bound for energies to plot. 
             Defaults to inf.
         cmap : str, optional
-            Color mapping to be used for heatmap.
+            Color mapping to be used for heatmap. 
             Can be set as any Matplotlib cmap.
         tick_step : int, optional
-            How often the tick marks should be
+            How often the tick marks should be 
             placed on axis.
         mode : str, optional
-            Can be either 'research' or
-            'publication'. Research is geared towards
-            finding the group and value for a matrix spot
-            while publication looks more like the heatmaps
+            Can be either 'research' or 
+            'publication'. Research is geared towards 
+            finding the group and value for a matrix spot 
+            while publication looks more like the heatmaps 
             found in published papers.
         label1 : str, optional
-            Desired text for the first nuclide and reaction
+            Desired text for the first nuclide and reaction.
         label2 : str, optional
-            Desired text for the second nuclide and reaction
+            Desired text for the second nuclide and reaction.
         
         '''
         # Figure out which nuclide and reaction should come first in the key
@@ -547,7 +557,7 @@ class Plots():
         # Rotate the x axis tick labels by 45 degrees.
         plt.setp(ax.get_xticklabels(), rotation=45, ha='left', rotation_mode='anchor')
 
-        # Put the IDs into readable text
+        # Put the IDs into readable text if no labels given
         if label1 is None:
             label1 = self.get_mat_name(mat_mt_1[0])
             label1 += ' '

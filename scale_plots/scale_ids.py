@@ -11,7 +11,7 @@ mt_ids = {1:'n,total', 2:'z,z0', 3:'z,nonelastic', 4:'z,n', 5:'z,anything', 10:'
           114:'z,d2\u03b1', 115:'z,pd', 116:'z,pt', 117:'z,d\u03b1', 151:'n,RES', 201:'z,\u03a7n', 202:'z,\u03a7\u03b3',
           203:'z,\u03a7p', 204:'z,\u03a7d', 205:'z,\u03a7t', 206:'z,\u03a73He', 207:'z,\u03a7\u03b1', 208:'z,\u03a7\u03c0+',
           209:'z,\u03a7\u03c00', 210:'z,\u03a7\u03c0-', 211:'z,\u03a7\u03bc+', 212:'z,\u03a7\u03bc-', 213:'z,\u03a7\u03ba+',
-          214:'z,\u03a7\u03ba0long', 215:'z,\u03a7\u03ba0short', 216:'z,\u03a7\u03ba-', 217:'z,\u03a7p', 218:'z,\u03a7n', 251:'n,\u03bcL',
+          214:'z,\u03a7\u03ba0long', 215:'z,\u03a7\u03ba0short', 216:'z,\u03a7\u03ba-', 217:'z,\u03a7antip', 218:'z,\u03a7antin', 251:'n,\u03bcL',
           252:'n,\u03be', 253:'n,\u03b6', 301:'n,total kerma', 302:'z,z0 kerma', 303:'z,nonelastic kerma', 304:'z,n kerma',
           305:'z,anything kerma', 310:'z,continuum kerma', 311:'z,2nd kerma', 316:'z,2n kerma', 317:'z,3n kerma', 318:'z,fission kerma',
           319:'n,f kerma', 320:'n,nf kerma', 321:'n,2nf kerma', 322:'z,n\u03b1 kerma', 323:'n,n3\u03b1 kerma', 324:'z,2n\u03b1 kerma',
@@ -57,12 +57,15 @@ elements = {'H': 1, 'He': 2, 'Li': 3, 'Be': 4, 'B': 5, 'C': 6, 'N': 7, 'O': 8, '
             'Md': 101, 'No': 102, 'Lr': 103, 'Rf': 104, 'Db': 105, 'Sg': 106, 'Bh': 107, 'Hs': 108, 'Mt': 109,
             'Ds': 110, 'Rg': 111, 'Cn': 112, 'Nh': 113, 'Fl': 114, 'Mc': 115, 'Lv': 116, 'Ts': 117, 'Og': 118}
 
-specials = {1002: 'D', 1001001: 'H-liquid_CH4', 1013027: 'Albound', 1040090: 'Zr90-Zr5H8', 1040091: 'Zr91-Zr5H8',
+# Special cases for nuclides
+# I have tried to get all of them, but some may have slipped
+# through the cracks.
+specials = {1002: 'D', 1001001: 'H-liquid_CH4', 1013027: 'Al27bound', 1040090: 'Zr90-Zr5H8', 1040091: 'Zr91-Zr5H8',
             1040092: 'Zr92-Zr5H8', 1040093: 'Zr93-Zr5H8', 1040094: 'Zr94-Zr5H8', 1040095: 'Zr95-Zr5H8',
             1040096: 'Zr96-Zr5H8', 2001001: 'H-solid_CH4', 3004009: 'Bebound', 4001001: 'H-cryo_ortho',
             4001002: 'D-cryo_ortho', 5001001: 'H-cryo_para', 5001002: 'D-cryo_para', 5004009: 'Be-BeO',
-            5008016: 'O-BeO', 6001001: 'H-benzene', 7001001: 'H-ZrH2', 8001001: 'Hfreegas', 8001002: 'Dfreegas',
-            9001001: 'H-poly', 3006000: 'graphite', 5006000: 'H-benzene', 1014028: 'Si28bound', 1014029: 'Si29bound',
+            5008016: 'O-BeO', 6001001: 'H-benzene h', 7001001: 'H-ZrH2', 8001001: 'Hfreegas', 8001002: 'Dfreegas',
+            9001001: 'H-poly', 3006000: 'graphite', 5006000: 'H-benzene c', 1014028: 'Si28bound', 1014029: 'Si29bound',
             1014030: 'Si30bound',  1026000: 'febound', 1027058: 'Co-58m', 1047110: 'Ag-110m', 1048115: 'Cd-115m',
             1052127: 'Te-127m', 1052129: 'Te-129m', 1061148: 'Pm-148m', 1067166: 'Ho-166m', 1095242: 'Am-242m',
             1095244: 'Am-244m', 1099254: 'Es-254m', 1008016: 'O-UO2', 1092235: 'U-UO2'}

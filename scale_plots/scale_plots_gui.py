@@ -2,11 +2,11 @@ import PyQt5
 import matplotlib.pyplot as plt
 import sys
 import os
+
 import scale_plots
-from scale_ids import mt_ids
 
 
-class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
+class SCALE_PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
     def __init__(self):
         PyQt5.QtWidgets.QMainWindow.__init__(self)
@@ -347,7 +347,13 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         sens_filename = PyQt5.QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', self.cwd)[0]
         # Parse the selected sdf file into a DataFrame
         if sens_filename != '' and sens_filename not in self.sens_filenames:
+            # Check for an sdf file
+            if sens_filename[-4:] != '.sdf':
+                print("File must be a '.sdf' file.")
+                return
+            # Parse the sensitivity file
             self.plots.sdf_to_df(sens_filename)
+            # Row to place the new file name
             row = len(self.sens_filenames)
 
             # Update the widget to show the filename
@@ -381,9 +387,16 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
     def parse_cov_file(self):
         # Let the user pick the covariance file to read in
         cov_filename = PyQt5.QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', self.cwd)[0]
+        
         # Parse the selected covariance file into the dictionary
         if cov_filename != '' and cov_filename not in self.cov_filenames:
+            # Check for the file not being a covariance file
+            if cov_filename[0:6] != 'scale.' and 'groupcov' not in cov_filename:
+                print('File must be a scale covariance file.')
+                return
+            # Parse the covariance file
             self.plots.parse_coverx(cov_filename)
+            # Row to place the new file name
             row = len(self.cov_filenames)
 
             # Update the widget to show the filename
@@ -724,7 +737,7 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
     def plot_cov(self):
         # If there is anything to plot
         if len(self.cov_filenames) > 0:
-            mt_names = {v: k for k, v in mt_ids.items()}
+            mt_names = {v: k for k, v in scale_plots.mt_ids.items()}
             # Get the mat and mt pairs
             mat1 = self.mat_ids[self.cov_reac1_nuclide_box.currentText()]
             mt1 = mt_names[self.cov_reac1_interaction_box.currentText()]
@@ -781,6 +794,6 @@ class PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     app = PyQt5.QtWidgets.QApplication(sys.argv)
-    widget = PLOTS_GUI()
+    widget = SCALE_PLOTS_GUI()
     widget.show()
     app.exec_()
