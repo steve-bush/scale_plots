@@ -220,6 +220,12 @@ class Plots():
             reac_1 = matrix_cntrl[1]
             mat_2 = matrix_cntrl[2]
             reac_2 = matrix_cntrl[3]
+            num_blocks = matrix_cntrl[4]
+
+            # If number of blocks is 2 Scale has updated their files
+            # If this gets raised someone will have to figure out their new format
+            assert num_blocks == 1, 'Scale has updated their format by splitting matrices into blocks.'
+
             # Iterate past number of bytes value
             matrix_cntrl_end += 4
 
@@ -255,7 +261,7 @@ class Plots():
                 col += 1
             matrices[(mat_1, reac_1, mat_2, reac_2)] = matrix
             prev_end = end + 4
-        
+
         # Save the covariance matrices for this file
         self.cov_matrices[fname] = matrices
 

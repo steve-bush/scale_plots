@@ -36,25 +36,19 @@ class SCALE_PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.widget.setLayout(self.layout)
         self.setCentralWidget(self.widget)
 
+        # Setup the sensitivity widget's widgets
+        self.init_sens()
+
+        # Setup the covariance widget's widgets
+        self.init_cov()
+
+    def init_sens(self):
         # Sensitivity widget
         self.sens_widget = PyQt5.QtWidgets.QGroupBox()
         self.sens_layout = PyQt5.QtWidgets.QVBoxLayout()
         self.sens_widget.setLayout(self.sens_layout)
         self.layout.addWidget(self.sens_widget)
 
-        # Setup the sensitivity widget's widgets
-        self.init_sens()
-
-        # Covariance widget
-        self.cov_widget = PyQt5.QtWidgets.QGroupBox()
-        self.cov_layout = PyQt5.QtWidgets.QVBoxLayout()
-        self.cov_widget.setLayout(self.cov_layout)
-        self.layout.addWidget(self.cov_widget)
-
-        # Setup the covariance widget's widgets
-        self.init_cov()
-
-    def init_sens(self):
         # Create label for sensitivity file selection
         self.sens_files_label = PyQt5.QtWidgets.QLabel('Sensitivity Files')
         self.sens_files_label.setFont(PyQt5.QtGui.QFont('Arial', 14))
@@ -198,6 +192,12 @@ class SCALE_PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.sens_layout.addWidget(self.plot_per_lethargy_btn, 12)
 
     def init_cov(self):
+        # Covariance widget
+        self.cov_widget = PyQt5.QtWidgets.QGroupBox()
+        self.cov_layout = PyQt5.QtWidgets.QVBoxLayout()
+        self.cov_widget.setLayout(self.cov_layout)
+        self.layout.addWidget(self.cov_widget)
+
         # Create label for covariance file selection
         self.cov_files_label = PyQt5.QtWidgets.QLabel('Covariance Files')
         self.cov_files_label.setFont(PyQt5.QtGui.QFont('Arial', 14))
@@ -703,8 +703,11 @@ class SCALE_PLOTS_GUI(PyQt5.QtWidgets.QMainWindow):
         self.legend_entry_edits = {}
 
     def plot_sens(self):
+        # If user has not selected any reaction
+        if len(self.sens_keys) == 0:
+            print("No reactions are selected to plot. Please press 'Add'.")
         # If there is anything to plot
-        if len(self.sens_keys) > 0:
+        elif len(self.sens_keys) > 0:
             # Get the high and low bounds
             elow = float(self.sens_elow_box.currentText())
             ehigh = float(self.sens_ehigh_box.currentText())
