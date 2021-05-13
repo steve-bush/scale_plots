@@ -120,7 +120,7 @@ class Test():
         print('Testing MAT names...')
 
         # Create a set of all mat ids
-        mats = []
+        mats = list(specials.keys())
         for mat1, _, mat2, _ in self.plots.cov_matrices[self.filename].keys():
             mats.append(mat1)
             mats.append(mat2)
