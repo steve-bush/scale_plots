@@ -10,12 +10,15 @@ Required python libraries:
 
 To import the module add `PYTHONPATH="$PYTHONPATH:/path/to/scale_plots"` to your bashrc.
 
-##Full GUI
+## Full GUI
 ![full gui](./pictures/full_gui.png)
+
 You can comment out the function calls for initializing either sections.
 
 ### Sensitivity UI and Plots
+
 ![sensitivity plot](./pictures/sensitivity_plot.png)
+
 * Can support multiple sdf files at once of either sdf file format.​
 * Reaction selection allows resetting selections and changing the legend’s label for each reaction.
 * Plotting options allows:​
