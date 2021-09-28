@@ -10,6 +10,32 @@ Required python libraries:
 
 To import the module add `PYTHONPATH="$PYTHONPATH:/path/to/scale_plots"` to your bashrc.
 
+##Full GUI
+![full gui](./pictures/full_gui.png)
+You can comment out the function calls for initializing either sections.
+
+### Sensitivity UI and Plots
+![sensitivity plot](./pictures/sensitivity_plot.png)
+* Can support multiple sdf files at once of either sdf file format.​
+* Reaction selection allows resetting selections and changing the legend’s label for each reaction.
+* Plotting options allows:​
+    * Either error bars or fill between​
+    * Indexing for energy bounds​
+    * Correlation with text position​
+    * Both sensitivity and sensitivity per unit lethargy​
+
+### Covariance UI and Plots
+![covariance plots](./pictures/covariance_plot.png)
+* Works for multiple files. Currently tested on 44 and 56 group.​
+* Reaction selection works much like the sensitivity.​
+* Plotting options allows:​
+    * 2 formats for the plots​
+    * Indexing energy bounds​
+    * Tick step to space x and y labels​
+    * Color mapping selection​
+    * Both covariance matrix and correlation matrix​
+
+### Code Documentation
 #### `class scale_plots.Plots()`
 Object that contains the functions needed to parse and plot the data from a sdf file.
 
